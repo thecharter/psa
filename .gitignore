@@ -1,0 +1,10 @@
+# Charter generated proof workspaces and build artifacts
+.charter/
+out/
+
+# macOS & editor files
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
