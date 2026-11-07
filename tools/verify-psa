@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# End-to-end Charter 1.0 verification gate for The Protocol of Sovereign Agency (PSA):
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+CHARTER_DIR="${CHARTER_DIR:-$HOME/charter}"
+CHARTER_BIN="${CHARTER_BIN:-$CHARTER_DIR/.lake/build/bin/charter}"
+SERVER_BIN="${SERVER_BIN:-$CHARTER_DIR/.lake/build/bin/charter-server}"
+
+[ -x "$CHARTER_BIN" ] || { echo "FAIL: missing charter binary at $CHARTER_BIN"; exit 2; }
+[ -x "$SERVER_BIN" ] || { echo "FAIL: missing charter-server binary at $SERVER_BIN"; exit 2; }
+
+mkdir -p out
+
+echo "==> [1/6] Verify Law 8 (psa.md untouched) & SHA-256 lockfile digests"
+git diff --exit-code psa.md
+"$CHARTER_BIN" doctor --lock .
+
+echo "==> [2/6] Static resolution, SHA-256 Document/98-Clause provenance, & assurance gates"
+"$CHARTER_BIN" check --require-provenance --forbid-midstream-decls --deny-warnings psa.charter >/dev/null
+echo "ok   psa.charter: 98 SHA-256 clauses, 100% prose coverage, 0 warnings"
+
+echo "==> [3/6] Execute all 24 adversarial & governance scenarios, 16 Entrenched Invariants, & 3 Temporal Properties"
+"$CHARTER_BIN" test --require-provenance --forbid-midstream-decls --deny-warnings psa.charter
+
+echo "==> [4/6] Generate consolidated legal rulebook & statutory Default/Exception decision tables"
+"$CHARTER_BIN" doc psa.charter -o out/psa-rulebook.md >/dev/null
+grep -q "Decision Table: \`clean-state-delay-required\`" out/psa-rulebook.md
+grep -q "Decision Table: \`derived-arbiter-conflict\`" out/psa-rulebook.md
+echo "ok   out/psa-rulebook.md: consolidated rulebook & statutory decision tables verified"
+
+echo "==> [5/6] Build signed SHA-256 CIR artifact & verify under operator-blind charter-server"
+"$CHARTER_BIN" build psa.charter -o out/psa.artifact
+"$SERVER_BIN" verify out/psa.artifact
+
+echo "==> [6/6] Live operator-blind charter-server stdio evaluation, ReasonGraph explain, & log replay"
+rm -f out/psa-smoke.log
+python3 -I - "$CHARTER_DIR/sdk/python" "$SERVER_BIN" "out/psa.artifact" "out/psa-smoke.log" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from charter_client import CharterStdioClient
+
+client = CharterStdioClient(sys.argv[2], sys.argv[3], institution_id="psa-lin1", log_path=sys.argv[4])
+try:
+    ev_ok = client.evaluate("inscribe-living-voice", ["Ava"])
+    assert ev_ok.ok and ev_ok.outcome == "Allow", f"expected Allow for living voice, got {ev_ok.raw}"
+
+    ev_deny = client.evaluate("strip-rule-ratchet", ["Panel"])
+    assert ev_deny.ok and ev_deny.valid == "no", f"expected constitutional ratchet block, got {ev_deny.raw}"
+
+    exp = client.explain("approve-calibration-valve", ["Panel", "Am1", "Disp1"], audience="public")
+    assert exp.ok and "reasonGraph" in exp.raw, f"expected ReasonGraph, got {exp.raw}"
+
+    res = client.reserve("voice-1", "Ava", "inscribe-living-voice", ["Ava"])
+    assert res.ok, f"expected reservation, got {res.raw}"
+    auth = client.authorize("voice-1")
+    assert auth.ok and "token" in auth.raw, f"expected authorize token, got {auth.raw}"
+    conf = client.confirm_execution(auth.raw["token"], receipt_ref="rcpt-voice-1")
+    assert conf.ok and conf.state_version >= 1, f"expected confirmed state transition, got {conf.raw}"
+finally:
+    client.close()
+PY
+"$SERVER_BIN" replay out/psa.artifact out/psa-smoke.log >/dev/null
+rm -f out/psa-smoke.log
+echo "ok   charter-server live evaluation, ReasonGraph explain, two-phase execution, and hash-chained replay verified"

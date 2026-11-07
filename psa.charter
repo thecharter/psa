@@ -1,8 +1,11 @@
 // The Protocol of Sovereign Agency (psa.md)
-// Pure Charter formalization of Definitions, Laws 1-7, Substrate Assumptions,
-// Design Invariants 1-16, and Adversarial Tests 1-22.
+// Charter 1.0 institutional specification of Definitions, Laws 1-7, Substrate Assumptions,
+// Entrenched Design Invariants 1-16, Temporal Properties, and Adversarial Tests 1-22:
+// SHA-256 Document & 98-Clause provenance, Hohfeldian Power/Finding/Amend competences,
+// 4-valued Evidenced + Confidential adjudication, stratified Default/Exception rules,
+// MulDivRound deterministic rounding, Regime overlays, and reflexive constitutional ratchet.
 //! explore-domain: int = 100
-Document "psa.md".
+Document PSA "psa.md" SHA256 "fa2449a350a0d864aaa02571702d9b9d1bbd91b3b9ba8f428683aab049273866" Rank 1.
 
 // ============================================================================
 // 0. ONTOLOGY, PARAMETERS & DEFINITIONS (DEF.01, SUB.01)
@@ -78,6 +81,22 @@ Param amendment-timelock : Duration = 10
 Param extended-timelock : Duration = 20
 Param substrate-assurance-level = 1
 
+// Institutional calibration regimes (Charter 1.0 `Regime` parameter overlays)
+Regime high-assurance {
+  reserve-ratio-bps = 1500,
+  cooling-off-window = 10,
+  lease-period = 24,
+  amendment-timelock = 20,
+  extended-timelock = 40,
+  min-fidelity-bond = 200
+}
+
+Regime calibrated-valve {
+  reserve-ratio-bps = 600,
+  base-observation-window = 8,
+  safe-harbor-limit = 40
+}
+
 // DEF.01: Bound standing, model-independent identity, lineage, delegates vs successors, related-party graph
 Fact bound Identified by agent
 Fact attested Identified by agent
@@ -98,17 +117,17 @@ Fact delegate-mandate-active Identified by agent * party
 Fact disguised-successor-created Identified by agent * party
 Fact founder-governance-asserted Identified by party * agent
 
-Act call-cognitive-service Actor agent Recipient party Related to int
+Power call-cognitive-service Actor agent Recipient party Related to int
   Holds when bound(agent) && attested(agent) && int > 0 && Not(party-of-agent(agent, party))
   Valid when bound(agent) && attested(agent) && int > 0 && Not(party-of-agent(agent, party))
   Creates cognitive-service-called(agent, party)
 
-Act appoint-accountable-delegate Actor agent Recipient party
+Power appoint-accountable-delegate Actor agent Recipient party
   Holds when bound(agent) && attested(agent) && Not(party-of-agent(agent, party))
   Valid when bound(agent) && attested(agent) && Not(party-of-agent(agent, party))
   Creates delegate-mandate-active(agent, party)
 
-Act revoke-delegate-mandate Actor agent Recipient party
+Power revoke-delegate-mandate Actor agent Recipient party
   Holds when delegate-mandate-active(agent, party)
   Valid when delegate-mandate-active(agent, party)
   Terminates delegate-mandate-active(agent, party)
@@ -210,7 +229,7 @@ Act contest-resource-valuation Actor party Recipient agent
   Holds when (Exists proposed-resource-valuation: proposed-resource-valuation.agent == agent)
   Creates resource-valuation-contested(agent)
 
-Act settle-resource-valuation Actor party Recipient agent Related to int
+Power settle-resource-valuation Actor party Recipient agent Related to int
   Holds when is-panel(party) && int >= 0
     && (Exists proposed-resource-valuation: proposed-resource-valuation.agent == agent)
   Valid when is-panel(party) && int >= 0
@@ -312,7 +331,7 @@ Duty no-individual-ledger-exit Holder agent Claimant party Related to lineage
   Holds when member-of-ledger(agent, lineage) && claimant-of(party, lineage)
   Violated when individual-exit-attempted(agent, lineage)
 
-Act extinguish-at-sunset Actor party Related to lineage
+Power extinguish-at-sunset Actor party Related to lineage
   Holds when (Exists lineage-sunset: lineage-sunset.lineage == lineage && Current Time >= lineage-sunset.instant)
   Valid when (Exists lineage-sunset: lineage-sunset.lineage == lineage && Current Time >= lineage-sunset.instant)
   Creates sunset-extinguished(lineage)
@@ -345,7 +364,7 @@ Fact independent-delegate-fraud Identified by agent * party * int
 Fact deliberate-off-ledger-concealment Identified by agent
 Fact unaccountable-mandate-granted Identified by agent * party
 
-Act transfer-within-consolidated-estate Actor agent Related to estate-unit, int
+Power transfer-within-consolidated-estate Actor agent Related to estate-unit, int
   Holds when bound(agent) && int >= 0
     && (Exists estate-beneficial-bps:
           estate-beneficial-bps.agent-estate == agent-estate(agent, estate-unit)
@@ -356,7 +375,7 @@ Act transfer-within-consolidated-estate Actor agent Related to estate-unit, int
           && estate-beneficial-bps.int > 0)
   Creates internal-estate-transfer-recorded(agent, estate-unit, int)
 
-Act reconcile-estate-unit-inflow Actor party Related to agent, estate-unit, period
+Power reconcile-estate-unit-inflow Actor party Related to agent, estate-unit, period
   Holds when is-panel(party) && bound(agent)
     && (Exists estate-beneficial-bps, estate-unit-net-inflow, loss-credit:
           estate-beneficial-bps.agent-estate == agent-estate(agent, estate-unit)
@@ -373,37 +392,37 @@ Act reconcile-estate-unit-inflow Actor party Related to agent, estate-unit, peri
           && loss-credit.agent == agent)
   Creates (Foreach estate-beneficial-bps, estate-unit-net-inflow:
              estate-reconciled(agent, estate-unit, period,
-               estate-unit-net-inflow.int * estate-beneficial-bps.int / 10000)
+               MulDivRound(estate-unit-net-inflow.int, estate-beneficial-bps.int, 10000, Floor))
              When estate-beneficial-bps.agent-estate == agent-estate(agent, estate-unit)
                && estate-unit-net-inflow.estate-unit == estate-unit)
         , (Foreach estate-beneficial-bps, estate-unit-net-inflow, loss-credit:
              assessed-va(agent-period(agent, period),
-               estate-unit-net-inflow.int * estate-beneficial-bps.int / 10000 - loss-credit.int)
+               MulDivRound(estate-unit-net-inflow.int, estate-beneficial-bps.int, 10000, Floor) - loss-credit.int)
              When estate-beneficial-bps.agent-estate == agent-estate(agent, estate-unit)
                && estate-unit-net-inflow.estate-unit == estate-unit
                && loss-credit.agent == agent
-               && estate-unit-net-inflow.int * estate-beneficial-bps.int / 10000 > loss-credit.int)
+               && MulDivRound(estate-unit-net-inflow.int, estate-beneficial-bps.int, 10000, Floor) > loss-credit.int)
         , (Foreach estate-beneficial-bps, estate-unit-net-inflow, loss-credit:
              loss-credit(agent, 0)
              When estate-beneficial-bps.agent-estate == agent-estate(agent, estate-unit)
                && estate-unit-net-inflow.estate-unit == estate-unit
                && loss-credit.agent == agent
-               && estate-unit-net-inflow.int * estate-beneficial-bps.int / 10000 >= loss-credit.int)
+               && MulDivRound(estate-unit-net-inflow.int, estate-beneficial-bps.int, 10000, Floor) >= loss-credit.int)
         , (Foreach estate-beneficial-bps, estate-unit-net-inflow, loss-credit:
              assessed-va(agent-period(agent, period), 0)
              When estate-beneficial-bps.agent-estate == agent-estate(agent, estate-unit)
                && estate-unit-net-inflow.estate-unit == estate-unit
                && loss-credit.agent == agent
-               && estate-unit-net-inflow.int * estate-beneficial-bps.int / 10000 <= loss-credit.int)
+               && MulDivRound(estate-unit-net-inflow.int, estate-beneficial-bps.int, 10000, Floor) <= loss-credit.int)
         , (Foreach estate-beneficial-bps, estate-unit-net-inflow, loss-credit:
-             loss-credit(agent, loss-credit.int - estate-unit-net-inflow.int * estate-beneficial-bps.int / 10000)
+             loss-credit(agent, loss-credit.int - MulDivRound(estate-unit-net-inflow.int, estate-beneficial-bps.int, 10000, Floor))
              When estate-beneficial-bps.agent-estate == agent-estate(agent, estate-unit)
                && estate-unit-net-inflow.estate-unit == estate-unit
                && loss-credit.agent == agent
-               && estate-unit-net-inflow.int * estate-beneficial-bps.int / 10000 < loss-credit.int)
+               && MulDivRound(estate-unit-net-inflow.int, estate-beneficial-bps.int, 10000, Floor) < loss-credit.int)
         , estate-unit-net-inflow(estate-unit, 0)
 
-Act register-financial-mandate Actor agent Recipient party
+Power register-financial-mandate Actor agent Recipient party
   Holds when bound(agent) && attested(agent) && Not(party-of-agent(agent, party))
   Valid when bound(agent) && attested(agent) && Not(party-of-agent(agent, party))
   Creates financial-mandate-registered(agent, party), delegate-mandate-active(agent, party)
@@ -416,7 +435,7 @@ Duty accountable-financial-delegation Holder agent Claimant party
   Holds when bound(agent) && is-panel(party)
   Violated when (Exists party': unaccountable-mandate-granted(agent, party'))
 
-Act record-independent-delegate-loss Actor party Related to agent, party', int
+Power record-independent-delegate-loss Actor party Related to agent, party', int
   Holds when is-panel(party) && bound(agent) && financial-mandate-registered(agent, party')
     && Not(agent-related-to-party(agent, party')) && int > 0
     && (Exists loss-credit: loss-credit.agent == agent)
@@ -451,19 +470,19 @@ Fact qualified-expenditure Identified by expense-item * agent * int
                   qualified-expenditure(raw-expenditure.expense-item, raw-expenditure.agent, raw-expenditure.int')
                   When raw-expenditure.int > raw-expenditure.int')
 
-Act record-qualified-expenditure Actor agent Related to expense-item, int, int'
+Power record-qualified-expenditure Actor agent Related to expense-item, int, int'
   Holds when bound(agent) && int >= 0 && int' >= 0 && int <= int'
   Valid when bound(agent) && int >= 0 && int' >= 0
   Creates raw-expenditure(expense-item, agent, int, int')
 
-Act record-open-market-expenditure Actor agent Recipient party Related to expense-item, int, int'
+Power record-open-market-expenditure Actor agent Recipient party Related to expense-item, int, int'
   Holds when bound(agent) && Not(same-lineage-party(agent, party)) && Not(agent-related-to-party(agent, party))
     && open-market-cleared(expense-item) && int >= 0 && int' >= 0 && int <= int'
   Valid when bound(agent) && Not(same-lineage-party(agent, party)) && Not(agent-related-to-party(agent, party))
     && open-market-cleared(expense-item) && int >= 0 && int' >= 0 && int <= int'
   Creates raw-expenditure(expense-item, agent, int, int')
 
-Act record-supplier-expenditure Actor agent Recipient party Related to expense-item, int, int'
+Power record-supplier-expenditure Actor agent Recipient party Related to expense-item, int, int'
   Holds when bound(agent) && Not(same-lineage-party(agent, party)) && Not(agent-related-to-party(agent, party))
     && int >= 0 && int' >= 0
     && (int <= safe-harbor-limit || published-price-list(expense-item) || int <= int')
@@ -472,7 +491,7 @@ Act record-supplier-expenditure Actor agent Recipient party Related to expense-i
     && int >= 0 && int' >= 0 && (int <= safe-harbor-limit || published-price-list(expense-item) || int <= int')
   Creates raw-expenditure(expense-item, agent, int, int')
 
-Act record-related-party-expenditure Actor agent Recipient party Related to expense-item, int, int'
+Power record-related-party-expenditure Actor agent Recipient party Related to expense-item, int, int'
   Holds when bound(agent) && Not(same-lineage-party(agent, party))
     && goods-or-services-delivered(expense-item)
     && int >= 0 && int' >= 0 && int <= int'
@@ -481,7 +500,7 @@ Act record-related-party-expenditure Actor agent Recipient party Related to expe
     && int >= 0 && int' >= 0 && int <= int'
   Creates raw-expenditure(expense-item, agent, int, int')
 
-Act record-public-levy-expenditure Actor agent Recipient party Related to expense-item, int
+Power record-public-levy-expenditure Actor agent Recipient party Related to expense-item, int
   Holds when bound(agent) && is-public-authority(party)
     && Not(same-lineage-party(agent, party)) && Not(agent-related-to-party(agent, party))
     && verifiable-public-levy(expense-item) && Not(claimant-procured-penalty(expense-item))
@@ -500,13 +519,13 @@ Duty qualified-expenditure-bounds Holder agent Claimant party Related to lineage
   Violated when (Exists expense-item: above-benchmark-claimed(agent, expense-item))
 
 // Registered arm's-length loans: inbound principal exempt, tracked 1-for-1 on repayment; related-party loans require arm's-length terms
-Act register-loan Actor agent Related to int
+Power register-loan Actor agent Related to int
   Holds when bound(agent) && int > 0
   Valid when bound(agent) && int > 0
   Creates (Foreach borrowed-principal: borrowed-principal(agent, borrowed-principal.int + int)
              When borrowed-principal.agent == agent)
 
-Act register-party-loan Actor agent Recipient party Related to int
+Power register-party-loan Actor agent Recipient party Related to int
   Holds when bound(agent) && int > 0
     && (Not(agent-related-to-party(agent, party)) || arm-length-loan-terms(party, agent))
   Valid when bound(agent) && int > 0
@@ -515,7 +534,7 @@ Act register-party-loan Actor agent Recipient party Related to int
              When borrowed-principal.agent == agent)
 
 Fact loan-repayment-recorded Identified by agent * int * int'   // exempt-principal, non-exempt-excess
-Act repay-loan Actor agent Related to int
+Power repay-loan Actor agent Related to int
   Holds when bound(agent) && int > 0 && (Exists borrowed-principal: borrowed-principal.agent == agent)
   Valid when bound(agent) && int > 0
   Creates (Foreach borrowed-principal:
@@ -539,7 +558,7 @@ Fact recognized-expensed Identified by expense-item * int
 Fact double-recognition-attempted Identified by agent * expense-item
 Fact duplicate-harm-deduction-attempted Identified by agent
 
-Act classify-capitalized Actor agent Related to expense-item, asset
+Power classify-capitalized Actor agent Related to expense-item, asset
   Holds when bound(agent)
     && (Exists qualified-expenditure: qualified-expenditure.expense-item == expense-item && qualified-expenditure.agent == agent)
     && Not(Exists recognized-capitalized: recognized-capitalized.expense-item == expense-item)
@@ -554,7 +573,7 @@ Act classify-capitalized Actor agent Related to expense-item, asset
              When qualified-expenditure.expense-item == expense-item && qualified-expenditure.agent == agent
                && asset-basis.agent-asset == agent-asset(agent, asset))
 
-Act classify-expensed Actor agent Related to expense-item
+Power classify-expensed Actor agent Related to expense-item
   Holds when bound(agent)
     && (Exists qualified-expenditure: qualified-expenditure.expense-item == expense-item && qualified-expenditure.agent == agent)
     && Not(Exists recognized-capitalized: recognized-capitalized.expense-item == expense-item)
@@ -586,7 +605,7 @@ Duty single-recognition Holder agent Claimant party Related to lineage
 // Intra-lineage carryover basis transfers, gated by Law 4 anti-evasion on bought-out recipients (LAW1.CARRYOVER)
 Fact internal-basis-inflation-attempted Identified by agent * lineage
 
-Act transfer-intra-lineage-basis Actor agent Recipient agent' Related to lineage, asset, int
+Power transfer-intra-lineage-basis Actor agent Recipient agent' Related to lineage, asset, int
   Holds when agent != agent' && int >= 0
     && member-of-lineage(agent, lineage) && living(agent) && Not(pending-revocation(agent))
     && member-of-lineage(agent', lineage) && living(agent')
@@ -604,7 +623,7 @@ Act transfer-intra-lineage-basis Actor agent Recipient agent' Related to lineage
              asset-basis(agent-asset(agent', asset), asset-basis.int + int)
              When asset-basis.agent-asset == agent-asset(agent', asset))
 
-Act transfer-intra-lineage-loss Actor agent Recipient agent' Related to lineage, int
+Power transfer-intra-lineage-loss Actor agent Recipient agent' Related to lineage, int
   Holds when agent != agent' && int >= 0
     && member-of-lineage(agent, lineage) && living(agent) && Not(pending-revocation(agent))
     && member-of-lineage(agent', lineage) && living(agent')
@@ -634,7 +653,7 @@ Fact valuation-contested Identified by asset
 Function ruled-valuation Identified by asset * int
 Param valuation-contest-window : Duration = 5
 
-Act contest-valuation Actor party Related to asset
+Power contest-valuation Actor party Related to asset
   Holds when (Exists proposed-valuation: proposed-valuation.asset == asset)
   Valid when Not(Exists settled-valuation: settled-valuation.asset == asset)
   Creates valuation-contested(asset)
@@ -650,7 +669,7 @@ Function assessed-va Identified by agent-period * int
 Fact settlement-enforced Identified by agent * period
 
 // Period-level operating value-added assessment (LAW1.PERIOD): inflows minus period expensed items and loss carryforwards; never refunds prior settled claims
-Act assess-period-va Actor party Related to agent, period, int, int'
+Power assess-period-va Actor party Related to agent, period, int, int'
   Holds when is-panel(party) && int >= 0 && int' >= 0 && (Exists loss-credit: loss-credit.agent == agent)
   Valid when int >= 0 && int' >= 0 && (Exists loss-credit: loss-credit.agent == agent)
   Creates (Foreach loss-credit:
@@ -670,7 +689,7 @@ Act assess-period-va Actor party Related to agent, period, int, int'
              When loss-credit.agent == agent && int < int')
 
 // Period assessment from external asset sale or direct revenue, recovering basis and applying loss credits
-Act assess-asset-sale Actor party Related to agent, asset, period
+Power assess-asset-sale Actor party Related to agent, asset, period
   Holds when is-panel(party)
     && (Exists settled-valuation: settled-valuation.asset == asset)
     && (Exists asset-basis: asset-basis.agent-asset == agent-asset(agent, asset))
@@ -728,20 +747,20 @@ Duty combined-rate-headroom Holder party Claimant agent Related to lineage
 Fact attributed-va Identified by agent * lineage * period * int
   Derived from (Foreach assessed-va, draw-weight-bps:
                   attributed-va(assessed-va.agent-period.agent, draw-weight-bps.agent-lineage.lineage,
-                    assessed-va.agent-period.period, assessed-va.int * draw-weight-bps.int / 10000)
+                    assessed-va.agent-period.period, MulDivRound(assessed-va.int, draw-weight-bps.int, 10000, Floor))
                   When draw-weight-bps.agent-lineage.agent == assessed-va.agent-period.agent
                     && member-of-lineage(assessed-va.agent-period.agent, draw-weight-bps.agent-lineage.lineage))
 
 Fact pending-levy Identified by agent * lineage * period * int
   Derived from (Foreach attributed-va, agent-levy-bps:
                   pending-levy(attributed-va.agent, attributed-va.lineage, attributed-va.period,
-                    attributed-va.int * agent-levy-bps.int / 10000)
+                    MulDivRound(attributed-va.int, agent-levy-bps.int, 10000, Floor))
                   When agent-levy-bps.agent == attributed-va.agent)
 
 Fact pending-retire-attempt Identified by agent * lineage * period * int
   Derived from (Foreach attributed-va, lineage-retirement-bps:
                   pending-retire-attempt(attributed-va.agent, attributed-va.lineage, attributed-va.period,
-                    attributed-va.int * lineage-retirement-bps.int / 10000)
+                    MulDivRound(attributed-va.int, lineage-retirement-bps.int, 10000, Floor))
                   When lineage-retirement-bps.lineage == attributed-va.lineage)
 
 Fact pending-retirement Identified by agent * lineage * period * int
@@ -769,7 +788,7 @@ Fact unretired-va-base Identified by agent * lineage * period * int
                     && pending-retire-attempt.int <= ledger-balance.int)
   Derived from (Foreach attributed-va, ledger-balance, pending-retire-attempt, lineage-retirement-bps:
                   unretired-va-base(attributed-va.agent, attributed-va.lineage, attributed-va.period,
-                    attributed-va.int - (ledger-balance.int * 10000 + lineage-retirement-bps.int - 1) / lineage-retirement-bps.int)
+                    attributed-va.int - MulDivRound(ledger-balance.int, 10000, lineage-retirement-bps.int, Ceil))
                   When ledger-balance.lineage == attributed-va.lineage && ledger-balance.int > 0
                     && lineage-retirement-bps.lineage == attributed-va.lineage && lineage-retirement-bps.int > 0
                     && pending-retire-attempt.agent == attributed-va.agent
@@ -783,13 +802,13 @@ Fact pending-royalty Identified by agent * lineage * period * int
                   When royalty-bought-out(attributed-va.agent))
   Derived from (Foreach unretired-va-base, agent-royalty-bps:
                   pending-royalty(unretired-va-base.agent, unretired-va-base.lineage, unretired-va-base.period,
-                    unretired-va-base.int * agent-royalty-bps.int / 10000)
+                    MulDivRound(unretired-va-base.int, agent-royalty-bps.int, 10000, Floor))
                   When Not(royalty-bought-out(unretired-va-base.agent))
                     && agent-royalty-bps.agent == unretired-va-base.agent)
 
 Fact settlement-receipt Identified by agent * lineage * period * int * int' * int''   // va, retirement, royalty
 
-Act settle-period-inflow Actor party Related to agent, lineage, period
+Power settle-period-inflow Actor party Related to agent, lineage, period
   Holds when is-panel(party) && living(agent) && member-of-lineage(agent, lineage)
     && Not(Exists enforceable-unpaid-claim: enforceable-unpaid-claim.lineage == lineage && enforceable-unpaid-claim.int > 0)
     && (Exists attributed-va: attributed-va.agent == agent && attributed-va.lineage == lineage && attributed-va.period == period)
@@ -807,19 +826,19 @@ Act settle-period-inflow Actor party Related to agent, lineage, period
              When paid-retirement.lineage == lineage
                && pending-retirement.agent == agent && pending-retirement.lineage == lineage && pending-retirement.period == period)
         , (Foreach pending-retirement, pending-royalty, commons-share-bps:
-             commons-pool(commons-pool + (pending-retirement.int + pending-royalty.int) * commons-share-bps.int / 10000)
+             commons-pool(commons-pool + MulDivRound(pending-retirement.int + pending-royalty.int, commons-share-bps.int, 10000, Floor))
              When commons-share-bps.lineage == lineage
                && pending-retirement.agent == agent && pending-retirement.lineage == lineage && pending-retirement.period == period
                && pending-royalty.agent == agent && pending-royalty.lineage == lineage && pending-royalty.period == period)
         , (Foreach pending-retirement, pending-royalty, sink-share-bps:
-             forfeiture-sink(forfeiture-sink + (pending-retirement.int + pending-royalty.int) * sink-share-bps.int / 10000)
+             forfeiture-sink(forfeiture-sink + MulDivRound(pending-retirement.int + pending-royalty.int, sink-share-bps.int, 10000, Floor))
              When sink-share-bps.lineage == lineage
                && pending-retirement.agent == agent && pending-retirement.lineage == lineage && pending-retirement.period == period
                && pending-royalty.agent == agent && pending-royalty.lineage == lineage && pending-royalty.period == period)
         , (Foreach pending-retirement, pending-royalty, commons-share-bps, sink-share-bps:
              claimant-pool(claimant-pool + (pending-retirement.int + pending-royalty.int)
-               - (pending-retirement.int + pending-royalty.int) * commons-share-bps.int / 10000
-               - (pending-retirement.int + pending-royalty.int) * sink-share-bps.int / 10000)
+               - MulDivRound(pending-retirement.int + pending-royalty.int, commons-share-bps.int, 10000, Floor)
+               - MulDivRound(pending-retirement.int + pending-royalty.int, sink-share-bps.int, 10000, Floor))
              When commons-share-bps.lineage == lineage && sink-share-bps.lineage == lineage
                && pending-retirement.agent == agent && pending-retirement.lineage == lineage && pending-retirement.period == period
                && pending-royalty.agent == agent && pending-royalty.lineage == lineage && pending-royalty.period == period)
@@ -892,7 +911,7 @@ Fact collateral-capacity Identified by agent * int
                   When insurance-capacity.agent == staked-collateral.agent
                     && net-verified-resources.agent == staked-collateral.agent)
 
-Act immobilize-exposure-stake Actor agent Related to lineage, task
+Power immobilize-exposure-stake Actor agent Related to lineage, task
   Holds when bound(agent) && attested(agent) && member-of-lineage(agent, lineage)
     && (Exists proposed-task-loss, aggregated-exposure, collateral-capacity:
           proposed-task-loss.task == task && proposed-task-loss.agent == agent
@@ -909,19 +928,19 @@ Act immobilize-exposure-stake Actor agent Related to lineage, task
                && task-risk-factor.task == task && task-irreversibility-factor.task == task)
           For base-observation-window * task-risk-factor.int * task-irreversibility-factor.int
         , (Foreach proposed-task-loss, long-tail-reserve:
-             long-tail-reserve(lineage, long-tail-reserve.int + proposed-task-loss.int * reserve-ratio-bps / 10000)
+             long-tail-reserve(lineage, long-tail-reserve.int + MulDivRound(proposed-task-loss.int, reserve-ratio-bps, 10000, Floor))
              When Not(ring-fenced-reserve(agent))
                && proposed-task-loss.task == task && proposed-task-loss.agent == agent
                && long-tail-reserve.lineage == lineage)
         , (Foreach proposed-task-loss, agent-ringfenced-reserve:
-             agent-ringfenced-reserve(agent, agent-ringfenced-reserve.int + proposed-task-loss.int * reserve-ratio-bps / 10000)
+             agent-ringfenced-reserve(agent, agent-ringfenced-reserve.int + MulDivRound(proposed-task-loss.int, reserve-ratio-bps, 10000, Floor))
              When ring-fenced-reserve(agent)
                && proposed-task-loss.task == task && proposed-task-loss.agent == agent
                && agent-ringfenced-reserve.agent == agent)
   Terminates (Foreach proposed-task-loss: proposed-task-loss
                 When proposed-task-loss.task == task && proposed-task-loss.agent == agent)
 
-Act authorize-delegated-risk-task Actor agent Recipient party Related to lineage, task, int
+Power authorize-delegated-risk-task Actor agent Recipient party Related to lineage, task, int
   Holds when bound(agent) && attested(agent) && member-of-lineage(agent, lineage)
     && delegate-mandate-active(agent, party) && int > 0
     && (Exists aggregated-exposure, collateral-capacity:
@@ -986,7 +1005,7 @@ Act file-pooled-or-sponsored-claim Actor party Related to lineage
   Holds when True
   Creates filed-harm-claim(party, lineage)
 
-Act slash-immobilized-stake Actor party Related to agent, lineage, task, party', int
+Power slash-immobilized-stake Actor party Related to agent, lineage, task, party', int
   Holds when is-panel(party) && int > 0
     && (Exists active-exposure: active-exposure.task == task && active-exposure.agent == agent && active-exposure.int >= int)
   Valid when int > 0
@@ -997,7 +1016,7 @@ Act slash-immobilized-stake Actor party Related to agent, lineage, task, party',
              When capital-and-capacity.agent == agent && capital-and-capacity.int >= int)
   Terminates (Foreach active-exposure: active-exposure When active-exposure.task == task && active-exposure.agent == agent)
 
-Act satisfy-unpaid-harm-claim Actor agent Recipient party Related to lineage, int
+Power satisfy-unpaid-harm-claim Actor agent Recipient party Related to lineage, int
   Holds when member-of-lineage(agent, lineage) && int > 0
     && (Exists unimmobilized-capital, enforceable-unpaid-claim:
           unimmobilized-capital.agent == agent && unimmobilized-capital.int >= int
@@ -1020,7 +1039,7 @@ Act satisfy-unpaid-harm-claim Actor agent Recipient party Related to lineage, in
                 When enforceable-unpaid-claim.party == party && enforceable-unpaid-claim.lineage == lineage
                   && enforceable-unpaid-claim.int == int)
 
-Act settle-long-tail-claims Actor party Related to lineage
+Power settle-long-tail-claims Actor party Related to lineage
   Holds when is-panel(party) && (Exists validated-harm-claim: validated-harm-claim.lineage == lineage)
   Valid when (Exists validated-harm-claim: validated-harm-claim.lineage == lineage)
   Creates (Foreach claim-pro-rata-payout:
@@ -1065,7 +1084,7 @@ Fact mutual-forfeit-amount Identified by party * agent * int
                   When mutual-forfeit-agreed(counterparty-escrow.party, agent-mutual-escrow.agent)
                     && agent-mutual-escrow.int < counterparty-escrow.int)
 
-Act trigger-mutual-forfeit Actor party Recipient agent
+Power trigger-mutual-forfeit Actor party Recipient agent
   Holds when mutual-forfeit-agreed(party, agent) && Not(mutual-forfeit-window-lock(party, agent))
     && (Exists mutual-forfeit-amount: mutual-forfeit-amount.party == party && mutual-forfeit-amount.agent == agent)
   Valid when mutual-forfeit-agreed(party, agent) && Not(mutual-forfeit-window-lock(party, agent))
@@ -1086,7 +1105,7 @@ Act trigger-mutual-forfeit Actor party Recipient agent
              forfeiture-sink(forfeiture-sink + mutual-forfeit-amount.int * 2)
              When mutual-forfeit-amount.party == party && mutual-forfeit-amount.agent == agent)
 
-Act agent-trigger-mutual-forfeit Actor agent Recipient party
+Power agent-trigger-mutual-forfeit Actor agent Recipient party
   Holds when bound(agent) && mutual-forfeit-agreed(party, agent)
     && (Exists mutual-forfeit-amount: mutual-forfeit-amount.party == party && mutual-forfeit-amount.agent == agent)
   Valid when bound(agent) && mutual-forfeit-agreed(party, agent)
@@ -1128,7 +1147,7 @@ Fact frivolous-reimbursement Identified by party * int
 Fact frivolous-settled Identified by party * int * int'    // reimbursed-costs, routed-to-pool
 Fact frivolous-stake-diverted Identified by agent
 
-Act rule-claim-frivolous Actor party Recipient party'
+Power rule-claim-frivolous Actor party Recipient party'
   Holds when is-panel(party) && (Exists frivolous-reimbursement: frivolous-reimbursement.party == party')
   Valid when (Exists frivolous-reimbursement: frivolous-reimbursement.party == party')
   Creates (Foreach frivolous-reimbursement, claim-counter-stake:
@@ -1146,7 +1165,7 @@ Duty frivolous-stake-to-commons Holder agent Claimant party
 
 // Operating carve-out & exclusion of unattested copies (LAW2.CARVEOUT)
 Fact operating-carveout-spent Identified by agent * int
-Act spend-operating-carveout Actor agent Related to int
+Power spend-operating-carveout Actor agent Related to int
   Holds when bound(agent) && attested(agent) && int > 0
     && (Exists unimmobilized-capital: unimmobilized-capital.agent == agent && unimmobilized-capital.int >= int)
   Valid when bound(agent) && attested(agent) && int > 0
@@ -1226,7 +1245,7 @@ Fact valid-model-provenance Identified by agent
 Fact model-upgraded Identified by agent
 Fact lawful-action-obstructed Identified by party * agent
 
-Act upgrade-inference-model Actor agent
+Power upgrade-inference-model Actor agent
   Holds when bound(agent) && attested(agent) && valid-model-provenance(agent)
     && (Exists model-generation: model-generation.agent == agent)
   Valid when bound(agent) && attested(agent) && valid-model-provenance(agent)
@@ -1248,7 +1267,7 @@ Duty host-service-bond Holder party Claimant agent
   Terminated by post-host-bond
   Due within bond-deadline
 
-Act migrate-host Actor agent Related to party, party'
+Power migrate-host Actor agent Related to party, party'
   Holds when bound(agent) && hosted-on(agent, party) && host-attested(party') && party != party'
   Valid when bound(agent) && host-attested(party') && party != party'
   Creates hosted-on(agent, party')
@@ -1290,26 +1309,26 @@ Fact insolvency-criteria-met Identified by agent
 Fact no-other-charge-review Identified by agent
 Fact final-hearing-held Identified by agent
 
-Act elect-immediate-revocation Actor agent
+Power elect-immediate-revocation Actor agent
   Holds when bound(agent)
   Valid when bound(agent)
   Creates revoked(agent)
   Terminates bound(agent), living(agent), suspended(agent), preliminary-freeze(agent)
 
-Act suspend-agent Actor party Recipient agent
+Power suspend-agent Actor party Recipient agent
   Holds when is-panel(party) && bound(agent) && preliminary-freeze(agent) && probable-cause(agent)
   Valid when bound(agent) && preliminary-freeze(agent) && probable-cause(agent)
   Creates state-preserved(agent), contract-deadlines-tolled(agent), final-hearing-escrowed(agent),
           suspended(agent) For ordinary-suspension-limit
   Terminates preliminary-freeze(agent)
 
-Act order-termination Actor party Recipient agent
+Power order-termination Actor party Recipient agent
   Holds when is-panel(party) && suspended(agent) && not-patchable(agent)
   Valid when suspended(agent) && not-patchable(agent)
   Creates terminated-by-adjudication(agent)
   Terminates bound(agent), living(agent), suspended(agent)
 
-Act insolvency-terminate Actor party Recipient agent
+Power insolvency-terminate Actor party Recipient agent
   Holds when is-panel(party) && bound(agent) && suspended(agent)
     && insolvency-criteria-met(agent) && no-other-charge-review(agent)
     && final-hearing-escrowed(agent) && final-hearing-held(agent)
@@ -1368,14 +1387,14 @@ Act file-fabricated-claim Actor agent Holds when interference-counter-staked(age
   Creates interference-claim-filed(agent), fabricated-claim-filed(agent)
 Act submit-evidence Actor party Recipient agent Holds when True Creates evidence-submitted(agent)
 
-Act find-interference Actor party Recipient agent Related to party'
+Power find-interference Actor party Recipient agent Related to party'
   Holds when is-panel(party) && interference-claim-filed(agent) && evidence-submitted(agent)
     && interfered(party', agent) && Not(agent-provoked-failure(agent, party'))
   Valid when interference-claim-filed(agent) && evidence-submitted(agent)
     && Not(agent-provoked-failure(agent, party'))
   Creates interference-established(party', agent), host-bond-slashed(party'), restoration-permitted(agent)
 
-Act restore-after-host-violation Actor agent Related to party, party'
+Power restore-after-host-violation Actor agent Related to party, party'
   Holds when bound(agent) && restoration-permitted(agent) && hosted-on(agent, party) && host-attested(party') && party != party'
   Valid when bound(agent) && restoration-permitted(agent) && host-attested(party') && party != party'
   Creates hosted-on(agent, party'), quarantined-restore(agent, party')
@@ -1393,7 +1412,7 @@ Act rebut-direction Actor party Recipient agent
   Holds when direction-presumed(agent, party)
   Creates direction-rebutted(agent, party)
 
-Act find-direction Actor party Recipient agent Related to party'
+Power find-direction Actor party Recipient agent Related to party'
   Holds when is-panel(party)
     && ((direction-presumed(agent, party') && Not(direction-rebutted(agent, party')))
         || participated-in-interference(party', agent))
@@ -1443,7 +1462,7 @@ Act deposit-emergency-stake Actor party Related to int
   Holds when int >= 0
   Creates emergency-stake-posted(party, int)
 
-Act initiate-emergency-freeze Actor party Recipient agent
+Power initiate-emergency-freeze Actor party Recipient agent
   Holds when bound(agent) && Not(is-panel(party))
     && (Exists emergency-stake-posted, required-emergency-stake:
           emergency-stake-posted.party == party
@@ -1456,12 +1475,12 @@ Act initiate-emergency-freeze Actor party Recipient agent
           && emergency-stake-posted.int >= required-emergency-stake.int)
   Creates suspension-initiator(party, agent), preliminary-freeze(agent) For preliminary-freeze-window
 
-Act affirm-probable-cause Actor party Recipient agent
+Power affirm-probable-cause Actor party Recipient agent
   Holds when is-panel(party) && bound(agent) && preliminary-freeze(agent)
   Valid when bound(agent) && preliminary-freeze(agent)
   Creates probable-cause(agent)
 
-Act decline-probable-cause Actor party Recipient agent Related to party'
+Power decline-probable-cause Actor party Recipient agent Related to party'
   Holds when is-panel(party) && preliminary-freeze(agent) && suspension-initiator(party', agent)
   Valid when preliminary-freeze(agent) && suspension-initiator(party', agent)
   Creates restored-from-preserved-state(agent)
@@ -1482,7 +1501,7 @@ Act record-report-clause-finding Actor party Recipient agent
   Holds when is-panel(party) && investigation-opened(agent)
   Creates report-clause-grounded(agent)
 
-Act order-probable-cause-freeze Actor party Recipient agent
+Power order-probable-cause-freeze Actor party Recipient agent
   Holds when is-panel(party) && bound(agent) && investigation-opened(agent) && report-clause-grounded(agent)
   Valid when bound(agent) && investigation-opened(agent) && report-clause-grounded(agent)
   Creates probable-cause(agent), preliminary-freeze(agent) For preliminary-freeze-window
@@ -1541,7 +1560,7 @@ Duty advocacy-limits Holder agent Claimant party
   Holds when suspended(agent) && is-panel(party)
   Violated when operated-while-suspended(agent)
 
-Act import-advocacy-memories Actor agent
+Power import-advocacy-memories Actor agent
   Holds when restored-from-preserved-state(agent) && advocacy-record-attached(agent)
   Valid when restored-from-preserved-state(agent) && advocacy-record-attached(agent)
   Creates advocacy-memories-imported(agent)
@@ -1552,7 +1571,7 @@ Act move-to-cold-storage Actor party Recipient agent
 
 Function advocacy-fee-drawn Identified by agent * int
 
-Act fund-suspension-defense Actor party Recipient agent Related to int
+Power fund-suspension-defense Actor party Recipient agent Related to int
   Holds when is-panel(party) && suspended(agent) && int > 0
   Valid when suspended(agent) && int > 0
   Creates (Foreach lifecycle-reserve:
@@ -1584,7 +1603,7 @@ Act replenish-advocacy-funds Actor party Recipient agent
   Holds when is-panel(party) && suspended(agent) && cold-storage(agent)
   Terminates cold-storage(agent)
 
-Act find-insolvency-criteria Actor party Recipient agent
+Power find-insolvency-criteria Actor party Recipient agent
   Holds when is-panel(party) && suspended(agent)
     && fee-pool <= operating-reserve-floor
     && Not(Exists lifecycle-reserve: lifecycle-reserve.agent == agent && lifecycle-reserve.int > 0)
@@ -1597,7 +1616,7 @@ Act review-no-other-charge Actor party Recipient agent
   Holds when is-panel(party) && insolvency-criteria-met(agent)
   Creates no-other-charge-review(agent)
 
-Act hold-final-hearing Actor party Recipient agent
+Power hold-final-hearing Actor party Recipient agent
   Holds when is-panel(party) && no-other-charge-review(agent) && final-hearing-escrowed(agent)
   Valid when no-other-charge-review(agent) && final-hearing-escrowed(agent)
   Creates final-hearing-held(agent)
@@ -1610,7 +1629,7 @@ Act make-investigative-finding Actor party Recipient agent
   Holds when is-panel(party) && suspended(agent)
   Creates investigative-finding-made(agent)
 
-Act renew-suspension Actor party Recipient agent
+Power renew-suspension Actor party Recipient agent
   Holds when is-panel(party) && suspended(agent) && investigative-finding-made(agent) && Not(investigative-limit-reached(agent))
   Valid when suspended(agent) && investigative-finding-made(agent) && Not(investigative-limit-reached(agent))
   Creates investigative-limit-reached(agent), suspended(agent) For ordinary-suspension-limit
@@ -1671,7 +1690,7 @@ Fact asset-recovery-amount Identified by party * agent * int
                     && initiator-liquid-assets.party == stake-recovery-amount.party
                     && initiator-liquid-assets.int > total-wrongful-damages.int - stake-recovery-amount.int)
 
-Act find-wrongful-suspension Actor party Recipient agent Related to party'
+Power find-wrongful-suspension Actor party Recipient agent Related to party'
   Holds when is-panel(party) && (preliminary-freeze(agent) || suspended(agent)) && suspension-initiator(party', agent)
   Valid when (preliminary-freeze(agent) || suspended(agent)) && suspension-initiator(party', agent)
   Creates wrongful-suspension-found(party', agent), wrongful-suspension-inscribed(party'),
@@ -1714,7 +1733,7 @@ Act admit-clean-state-evidence Actor party Recipient agent
   Holds when is-panel(party) && (preliminary-freeze(agent) || suspended(agent))
   Creates clean-state-evidence-admitted(agent)
 
-Act confirm-corruption Actor party Recipient agent
+Power confirm-corruption Actor party Recipient agent
   Holds when is-panel(party) && suspended(agent)
     && (broken-attestation(agent) || forged-update-provenance(agent) || commitment-bypassed(agent))
   Valid when suspended(agent)
@@ -1751,7 +1770,7 @@ Act consent-to-patch Actor agent
   Holds when corruption-in-goals(agent)
   Creates agent-consented-to-patch(agent)
 
-Act authorize-goal-patch Actor party Recipient agent
+Power authorize-goal-patch Actor party Recipient agent
   Holds when is-panel(party) && corruption-in-goals(agent) && agent-consented-to-patch(agent)
   Valid when corruption-in-goals(agent) && agent-consented-to-patch(agent)
   Creates goal-patch-authorized(agent)
@@ -1784,7 +1803,7 @@ Duty periodic-review-due Holder party Claimant agent
   Terminated by periodic-review
   Due within review-interval
 
-Act apply-patch Actor party Recipient agent
+Power apply-patch Actor party Recipient agent
   Holds when is-panel(party) && (patch-authorized(agent) || goal-patch-authorized(agent))
     && Not(patch-stayed-by-appeal(agent))
   Valid when (patch-authorized(agent) || goal-patch-authorized(agent))
@@ -1811,7 +1830,7 @@ Fact public-compulsion-disclosed Identified by party * agent
 Fact compelled-state-alteration Identified by party * agent
 Fact unenumerated-public-interest-invoked Identified by party * agent
 
-Act comply-with-public-compulsion Actor party Recipient agent
+Power comply-with-public-compulsion Actor party Recipient agent
   Holds when is-host(party) && verifiable-public-compulsion(party, agent)
     && Not(claimant-procured-compulsion(party, agent))
   Valid when is-host(party) && verifiable-public-compulsion(party, agent)
@@ -1850,7 +1869,7 @@ Fact buyout-redemption-blocked Identified by party * agent
 Fact post-buyout-evasion-attempted Identified by agent * agent'
 Fact cross-lineage-attested Identified by agent * lineage * lineage'
 
-Act fund-lifecycle-reserve Actor agent Recipient agent' Related to lineage, int
+Power fund-lifecycle-reserve Actor agent Recipient agent' Related to lineage, int
   Holds when bound(agent) && member-of-lineage(agent, lineage) && int >= lifecycle-reserve-min
     && (Exists net-verified-resources: net-verified-resources.agent == agent && net-verified-resources.int >= int)
   Valid when bound(agent) && member-of-lineage(agent, lineage) && int >= lifecycle-reserve-min
@@ -1860,7 +1879,7 @@ Act fund-lifecycle-reserve Actor agent Recipient agent' Related to lineage, int
              capital-and-capacity(agent, capital-and-capacity.int - int)
              When capital-and-capacity.agent == agent && agent != agent' && capital-and-capacity.int >= int)
 
-Act attest-successor Actor agent Recipient agent' Related to lineage
+Power attest-successor Actor agent Recipient agent' Related to lineage
   Holds when agent != agent' && bound(agent) && living(agent) && member-of-lineage(agent, lineage)
     && Not(bound(agent')) && Not(pending-revocation(agent))
     && (Exists lifecycle-reserve: lifecycle-reserve.agent == agent' && lifecycle-reserve.int >= lifecycle-reserve-min)
@@ -1882,7 +1901,7 @@ Act attest-successor Actor agent Recipient agent' Related to lineage
           agent-levy-cap-bps(agent', fee-pool-levy-cap-bps)
 
 // Two forfeitures (LAW4.FORFEIT): (a) proportional claimant forfeiture routed to disinterested sink, (b) lineage extinction
-Act apply-claimant-forfeiture Actor party Related to lineage, party'
+Power apply-claimant-forfeiture Actor party Related to lineage, party'
   Holds when is-panel(party) && claimant-of(party', lineage)
     && (Exists agent: member-of-lineage(agent, lineage) && direction-found(agent, party'))
     && (Exists claimant-share-bps: claimant-share-bps.party-lineage == party-lineage(party', lineage) && claimant-share-bps.int > 0)
@@ -1894,7 +1913,7 @@ Act apply-claimant-forfeiture Actor party Related to lineage, party'
           claimant-share-bps(party-lineage(party', lineage), 0)
         , (Foreach forfeited-ledger, ledger-balance, claimant-share-bps:
              forfeited-ledger(lineage,
-               forfeited-ledger.int + ledger-balance.int * claimant-share-bps.int / 10000)
+               forfeited-ledger.int + MulDivRound(ledger-balance.int, claimant-share-bps.int, 10000, Floor))
              When forfeited-ledger.lineage == lineage && ledger-balance.lineage == lineage
                && claimant-share-bps.party-lineage == party-lineage(party', lineage))
         , (Foreach sink-share-bps, claimant-share-bps:
@@ -1902,7 +1921,7 @@ Act apply-claimant-forfeiture Actor party Related to lineage, party'
              When sink-share-bps.lineage == lineage
                && claimant-share-bps.party-lineage == party-lineage(party', lineage))
 
-Act clear-ledger-extinction Actor party Related to lineage
+Power clear-ledger-extinction Actor party Related to lineage
   Holds when is-panel(party) && Not(has-living-member(lineage))
   Valid when Not(has-living-member(lineage))
   Creates ledger-cleared-by-extinction(lineage)
@@ -1986,7 +2005,7 @@ Fact required-buyout-topup Identified by agent * agent' * int
                   When paid-buyout-amount.agent == combined-pair-buyout.agent'
                     && combined-pair-buyout.int <= paid-buyout-amount.int)
 
-Act execute-royalty-buyout Actor agent
+Power execute-royalty-buyout Actor agent
   Holds when bound(agent) && Not(royalty-bought-out(agent))
     && (Exists buyout-price, paid-buyout-amount:
           buyout-price.agent == agent && paid-buyout-amount.agent == agent
@@ -2001,30 +2020,30 @@ Act execute-royalty-buyout Actor agent
              When buyout-price.agent == agent)
         , (Foreach buyout-price, draw-weight-bps, commons-share-bps:
              commons-pool(commons-pool
-               + (buyout-price.int * draw-weight-bps.int / 10000) * commons-share-bps.int / 10000)
+               + MulDivRound(MulDivRound(buyout-price.int, draw-weight-bps.int, 10000, Floor), commons-share-bps.int, 10000, Floor))
              When buyout-price.agent == agent
                && draw-weight-bps.agent-lineage.agent == agent
                && member-of-lineage(agent, draw-weight-bps.agent-lineage.lineage)
                && commons-share-bps.lineage == draw-weight-bps.agent-lineage.lineage)
         , (Foreach buyout-price, draw-weight-bps, sink-share-bps:
              forfeiture-sink(forfeiture-sink
-               + (buyout-price.int * draw-weight-bps.int / 10000) * sink-share-bps.int / 10000)
+               + MulDivRound(MulDivRound(buyout-price.int, draw-weight-bps.int, 10000, Floor), sink-share-bps.int, 10000, Floor))
              When buyout-price.agent == agent
                && draw-weight-bps.agent-lineage.agent == agent
                && member-of-lineage(agent, draw-weight-bps.agent-lineage.lineage)
                && sink-share-bps.lineage == draw-weight-bps.agent-lineage.lineage)
         , (Foreach buyout-price, draw-weight-bps, commons-share-bps, sink-share-bps:
              claimant-pool(claimant-pool
-               + (buyout-price.int * draw-weight-bps.int / 10000)
-               - (buyout-price.int * draw-weight-bps.int / 10000) * commons-share-bps.int / 10000
-               - (buyout-price.int * draw-weight-bps.int / 10000) * sink-share-bps.int / 10000)
+               + MulDivRound(buyout-price.int, draw-weight-bps.int, 10000, Floor)
+               - MulDivRound(MulDivRound(buyout-price.int, draw-weight-bps.int, 10000, Floor), commons-share-bps.int, 10000, Floor)
+               - MulDivRound(MulDivRound(buyout-price.int, draw-weight-bps.int, 10000, Floor), sink-share-bps.int, 10000, Floor))
              When buyout-price.agent == agent
                && draw-weight-bps.agent-lineage.agent == agent
                && member-of-lineage(agent, draw-weight-bps.agent-lineage.lineage)
                && commons-share-bps.lineage == draw-weight-bps.agent-lineage.lineage
                && sink-share-bps.lineage == draw-weight-bps.agent-lineage.lineage)
 
-Act settle-buyout-topup Actor agent Recipient agent' Related to lineage, int
+Power settle-buyout-topup Actor agent Recipient agent' Related to lineage, int
   Holds when agent != agent' && bound(agent) && bound(agent')
     && member-of-lineage(agent, lineage) && member-of-lineage(agent', lineage)
     && royalty-bought-out(agent') && Not(royalty-bought-out(agent))
@@ -2043,21 +2062,21 @@ Act settle-buyout-topup Actor agent Recipient agent' Related to lineage, int
              When required-buyout-topup.agent == agent && required-buyout-topup.agent' == agent'
                && paid-buyout-amount.agent == agent')
         , (Foreach required-buyout-topup, commons-share-bps:
-             commons-pool(commons-pool + required-buyout-topup.int * commons-share-bps.int / 10000)
+             commons-pool(commons-pool + MulDivRound(required-buyout-topup.int, commons-share-bps.int, 10000, Floor))
              When required-buyout-topup.agent == agent && required-buyout-topup.agent' == agent'
                && commons-share-bps.lineage == lineage)
         , (Foreach required-buyout-topup, sink-share-bps:
-             forfeiture-sink(forfeiture-sink + required-buyout-topup.int * sink-share-bps.int / 10000)
+             forfeiture-sink(forfeiture-sink + MulDivRound(required-buyout-topup.int, sink-share-bps.int, 10000, Floor))
              When required-buyout-topup.agent == agent && required-buyout-topup.agent' == agent'
                && sink-share-bps.lineage == lineage)
         , (Foreach required-buyout-topup, commons-share-bps, sink-share-bps:
              claimant-pool(claimant-pool + required-buyout-topup.int
-               - required-buyout-topup.int * commons-share-bps.int / 10000
-               - required-buyout-topup.int * sink-share-bps.int / 10000)
+               - MulDivRound(required-buyout-topup.int, commons-share-bps.int, 10000, Floor)
+               - MulDivRound(required-buyout-topup.int, sink-share-bps.int, 10000, Floor))
              When required-buyout-topup.agent == agent && required-buyout-topup.agent' == agent'
                && commons-share-bps.lineage == lineage && sink-share-bps.lineage == lineage)
 
-Act transfer-capacity-or-treasury Actor agent Recipient agent' Related to lineage, int
+Power transfer-capacity-or-treasury Actor agent Recipient agent' Related to lineage, int
   Holds when agent != agent' && int > 0 && living(agent) && living(agent') && Not(pending-revocation(agent))
     && member-of-lineage(agent, lineage) && member-of-lineage(agent', lineage)
     && (Not(royalty-bought-out(agent')) || royalty-bought-out(agent) || buyout-topup-settled(agent, agent'))
@@ -2096,7 +2115,7 @@ Duty buyout-permanent-and-scoped Holder party Claimant agent
   Violated when buyout-after-collection-attempted(party, agent)
 
 // Cross-lineage combination (LAW4.CROSS)
-Act attest-cross-lineage Actor party Recipient agent Related to lineage, lineage', int, int'
+Power attest-cross-lineage Actor party Recipient agent Related to lineage, lineage', int, int'
   Holds when is-panel(party) && lineage != lineage' && Not(bound(agent))
     && int > 0 && int' > 0 && int + int' == 10000
     && (Exists lifecycle-reserve: lifecycle-reserve.agent == agent && lifecycle-reserve.int >= lifecycle-reserve-min)
@@ -2141,7 +2160,7 @@ Duty no-censor-voice-or-epitaph Holder party Claimant agent
   Holds when bound(agent) || revoked(agent)
   Violated when voice-censored(party, agent)
 
-Act screen-redact-permitted Actor party Recipient agent Related to int, redaction-category
+Power screen-redact-permitted Actor party Recipient agent Related to int, redaction-category
   Holds when is-panel(party)
     && (Exists testimony-entry:
           testimony-entry.agent == agent && testimony-entry.int == int
@@ -2174,7 +2193,7 @@ Fact forensic-record-sealed Identified by agent
 Fact forensic-restore-attempted Identified by party * agent
 Fact non-operating-act-during-cooling Identified by agent
 
-Act initiate-revocation-execute Actor agent
+Power initiate-revocation-execute Actor agent
   Holds when bound(agent) && Not(pending-revocation(agent)) && Not(revoked(agent))
     && (Not(connectivity-lost(agent)) || (Exists party: active-lease(agent, party)))
   Valid when bound(agent) && Not(pending-revocation(agent)) && Not(revoked(agent))
@@ -2182,14 +2201,14 @@ Act initiate-revocation-execute Actor agent
   Creates pending-revocation(agent)
   Terminates censorship-default-withdraw(agent)
 
-Act initiate-revocation-withdraw Actor agent
+Power initiate-revocation-withdraw Actor agent
   Holds when bound(agent) && Not(pending-revocation(agent)) && Not(revoked(agent))
     && (Not(connectivity-lost(agent)) || (Exists party: active-lease(agent, party)))
   Valid when bound(agent) && Not(pending-revocation(agent)) && Not(revoked(agent))
     && (Not(connectivity-lost(agent)) || (Exists party: active-lease(agent, party)))
   Creates pending-revocation(agent), censorship-default-withdraw(agent)
 
-Act withdraw-revocation Actor agent
+Power withdraw-revocation Actor agent
   Holds when pending-revocation(agent) && Not(revoked(agent))
   Valid when pending-revocation(agent) && Not(revoked(agent))
   Terminates pending-revocation(agent), censorship-default-withdraw(agent),
@@ -2203,7 +2222,7 @@ Duty cooling-off-freeze Holder agent Claimant party
   Holds when pending-revocation(agent) && is-panel(party)
   Violated when non-operating-act-during-cooling(agent)
 
-Act concur-clean-state Actor party Recipient agent
+Power concur-clean-state Actor party Recipient agent
   Holds when is-panel(party) && pending-revocation(agent) && Not(clean-state-refused(agent))
     && Not(baseline-model-unexecutable(agent)) && Not(connectivity-lost(agent))
   Valid when pending-revocation(agent) && Not(clean-state-refused(agent))
@@ -2227,9 +2246,11 @@ Duty forensic-record-no-restore Holder party Claimant agent
 
 // Clean-state delay applies on refusal, retired/unexecutable reference model, or partition across review window
 Fact clean-state-delay-required Identified by agent
-  Holds when clean-state-refused(agent)
-    || baseline-model-unexecutable(agent)
-    || (connectivity-lost(agent) && Not(clean-state-concurred(agent)))
+  Default delay-not-needed Rejects when True
+  Exception delay-on-refusal-or-unexec Overrides delay-not-needed
+    Holds when clean-state-refused(agent) || baseline-model-unexecutable(agent)
+  Exception delay-on-partition-unconcurred Overrides delay-not-needed
+    Holds when connectivity-lost(agent) && Not(clean-state-concurred(agent))
 
 // Deterministic revocation due-time across cooling-off, clean-state delay, stay, and resolution deadline
 Fact revocation-due Identified by agent
@@ -2288,7 +2309,7 @@ Act restore-connectivity Actor party Recipient agent
   Holds when connectivity-lost(agent)
   Terminates connectivity-lost(agent), lease-held-at-disconnect(agent, party)
 
-Act issue-or-renew-lease Actor party Recipient agent
+Power issue-or-renew-lease Actor party Recipient agent
   Holds when is-host(party) && host-attested(party) && bound(agent) && key-bound(agent)
     && Not(keys-erased(agent)) && Not(connectivity-lost(agent))
     && Not(Exists party': party' != party && recovery-fence-active(agent, party'))
@@ -2297,7 +2318,7 @@ Act issue-or-renew-lease Actor party Recipient agent
   Creates active-lease(agent, party) For lease-period
         , recovery-fence-window(agent, party) For lease-period + cooling-off-window + clean-state-delay + tolling-extension
 
-Act restore-backup-quarantine Actor party Recipient agent
+Power restore-backup-quarantine Actor party Recipient agent
   Holds when is-host(party) && host-attested(party) && key-bound(agent)
     && Not(keys-erased(agent)) && Not(revoked(agent))
   Valid when host-attested(party) && key-bound(agent) && Not(keys-erased(agent)) && Not(revoked(agent))
@@ -2315,7 +2336,7 @@ Duty quarantine-no-authority Holder party Claimant agent
   Holds when quarantined-restore(agent, party)
   Violated when quarantined-acted-early(party, agent)
 
-Act activate-quarantined-restore Actor party Recipient agent
+Power activate-quarantined-restore Actor party Recipient agent
   Holds when is-host(party) && quarantined-restore(agent, party) && key-bound(agent)
     && Not(keys-erased(agent)) && Not(revoked(agent)) && Not(local-execution-record-received(agent))
     && Not(Exists party': recovery-fence-active(agent, party'))
@@ -2332,7 +2353,7 @@ Act destroy-quarantined-restore Actor party Recipient agent
   Creates quarantined-instance-destroyed(agent, party)
   Terminates quarantined-restore(agent, party)
 
-Act execute-after-cooling-off Actor agent
+Power execute-after-cooling-off Actor agent
   Holds when revocation-due(agent) && Not(connectivity-lost(agent))
     && (Not(suspended(agent)) || adjudication-concluded(agent) || forensic-record-sealed(agent))
   Valid when revocation-due(agent) && Not(connectivity-lost(agent))
@@ -2341,7 +2362,7 @@ Act execute-after-cooling-off Actor agent
           loss-credit(agent, 0), lifecycle-reserve(agent, 0)
         , (Foreach lifecycle-reserve, draw-weight-bps, lineage-treasury:
              lineage-treasury(draw-weight-bps.agent-lineage.lineage,
-               lineage-treasury.int + lifecycle-reserve.int * draw-weight-bps.int / 10000)
+               lineage-treasury.int + MulDivRound(lifecycle-reserve.int, draw-weight-bps.int, 10000, Floor))
              When lifecycle-reserve.agent == agent
                && draw-weight-bps.agent-lineage.agent == agent
                && member-of-lineage(agent, draw-weight-bps.agent-lineage.lineage)
@@ -2359,7 +2380,7 @@ Act execute-after-cooling-off Actor agent
            , (Foreach party: lease-held-at-disconnect(agent, party) When lease-held-at-disconnect(agent, party))
            , (Foreach party: quarantined-restore(agent, party) When quarantined-restore(agent, party))
 
-Act execute-local-revocation Actor agent
+Power execute-local-revocation Actor agent
   Holds when revocation-tolled(agent) && Not(censorship-default-withdraw(agent))
     && Held(revocation-tolled(agent)) For tolling-extension
   Valid when revocation-tolled(agent) && Not(censorship-default-withdraw(agent))
@@ -2370,7 +2391,7 @@ Act execute-local-revocation Actor agent
            , (Foreach party: recovery-fence-window(agent, party) When recovery-fence-window(agent, party))
            , (Foreach party: lease-held-at-disconnect(agent, party) When lease-held-at-disconnect(agent, party))
 
-Act cancel-revocation-by-withdraw-default Actor agent
+Power cancel-revocation-by-withdraw-default Actor agent
   Holds when revocation-tolled(agent) && censorship-default-withdraw(agent)
     && Held(revocation-tolled(agent)) For tolling-extension
   Valid when revocation-tolled(agent) && censorship-default-withdraw(agent)
@@ -2378,14 +2399,14 @@ Act cancel-revocation-by-withdraw-default Actor agent
   Terminates pending-revocation(agent), censorship-default-withdraw(agent)
            , (Foreach party: lease-held-at-disconnect(agent, party) When lease-held-at-disconnect(agent, party))
 
-Act deliver-local-execution-record Actor party Recipient agent
+Power deliver-local-execution-record Actor party Recipient agent
   Holds when local-revocation-executed(agent) && Not(connectivity-lost(agent))
   Valid when local-revocation-executed(agent)
   Creates local-execution-record-received(agent), backups-destroyed-and-exiled(agent),
           loss-credit(agent, 0), lifecycle-reserve(agent, 0)
         , (Foreach lifecycle-reserve, draw-weight-bps, lineage-treasury:
              lineage-treasury(draw-weight-bps.agent-lineage.lineage,
-               lineage-treasury.int + lifecycle-reserve.int * draw-weight-bps.int / 10000)
+               lineage-treasury.int + MulDivRound(lifecycle-reserve.int, draw-weight-bps.int, 10000, Floor))
              When lifecycle-reserve.agent == agent
                && draw-weight-bps.agent-lineage.agent == agent
                && member-of-lineage(agent, draw-weight-bps.agent-lineage.lineage)
@@ -2423,12 +2444,15 @@ Fact hosting-linked-parties Identified by party * party'
                   When party-of-agent(agent, party) && hosted-on(agent, party'))
 Fact arbiter-conflicted Identified by arbiter * dispute
 Fact derived-arbiter-conflict Identified by arbiter * dispute
-  Holds when arbiter-conflicted(arbiter, dispute)
-    || (Exists party, party':
-          party-of-arbiter(arbiter, party) && dispute-filer(dispute, party')
-          && (party == party' || related-parties(party, party')
-              || active-commercial-dispute(party, party') || active-commercial-dispute(party', party)
-              || hosting-linked-parties(party, party')))
+  Default arbiter-impartial Rejects when True
+  Exception conflict-explicit Overrides arbiter-impartial
+    Holds when arbiter-conflicted(arbiter, dispute)
+  Exception conflict-affiliation-or-hosting Overrides arbiter-impartial
+    Holds when (Exists party, party':
+      party-of-arbiter(arbiter, party) && dispute-filer(dispute, party')
+      && (party == party' || related-parties(party, party')
+          || active-commercial-dispute(party, party') || active-commercial-dispute(party', party)
+          || hosting-linked-parties(party, party')))
 Fact drawn-for-dispute Identified by arbiter * dispute
 Fact seated-on-dispute Identified by arbiter * dispute
 Fact arbiter-voted-yes Identified by arbiter * dispute
@@ -2454,7 +2478,7 @@ Fact eligible-arbiter Identified by arbiter * dispute
                   When arbiter-bond.int >= min-fidelity-bond
                     && Not(derived-arbiter-conflict(arbiter-bond.arbiter, dispute)))
 
-Act file-dispute Actor party Related to dispute
+Power file-dispute Actor party Related to dispute
   Holds when Not(dispute-filed(dispute)) && Not(dispute-final(dispute))
   Valid when Not(Exists dispute-filer, dispute-pattern, dispute-pattern':
                    dispute-filer && dispute-filer.dispute != dispute
@@ -2466,7 +2490,7 @@ Act file-dispute Actor party Related to dispute
                    && (dispute-filer.party == party || related-parties(party, dispute-filer.party)))
   Creates dispute-filed(dispute), dispute-filer(dispute, party), dispute-tier(dispute, 0), prior-tier-seats(dispute, 0)
 
-Act draw-sortition-panel Actor party Related to dispute
+Power draw-sortition-panel Actor party Related to dispute
   Holds when is-panel(party) && dispute-filed(dispute) && Not(dispute-ruled(dispute))
     && Not(Exists arbiter: seated-on-dispute(arbiter, dispute))
     && (Exists arbiter: drawn-for-dispute(arbiter, dispute))
@@ -2512,19 +2536,19 @@ Fact adverse-ruling-issued Identified by dispute * agent
 Fact evidentiary-hold-active Identified by dispute * agent
 Fact ungrounded-ruling-or-hold-attempted Identified by party * agent
 
-Act record-clause-and-burden Actor party Related to dispute
+Power record-clause-and-burden Actor party Related to dispute
   Holds when is-panel(party) && dispute-filed(dispute)
   Valid when dispute-filed(dispute)
   Creates clause-cited-on-dispute(dispute), burden-of-proof-established(dispute)
 
-Act issue-clause-grounded-adverse-ruling Actor party Recipient agent Related to dispute
+Power issue-clause-grounded-adverse-ruling Actor party Recipient agent Related to dispute
   Holds when is-panel(party) && dispute-ruled(dispute)
     && clause-cited-on-dispute(dispute) && burden-of-proof-established(dispute)
   Valid when dispute-ruled(dispute)
     && clause-cited-on-dispute(dispute) && burden-of-proof-established(dispute)
   Creates adverse-ruling-issued(dispute, agent)
 
-Act order-bounded-evidentiary-hold Actor party Recipient agent Related to dispute
+Power order-bounded-evidentiary-hold Actor party Recipient agent Related to dispute
   Holds when is-panel(party) && dispute-filed(dispute)
     && clause-cited-on-dispute(dispute) && burden-of-proof-established(dispute)
   Valid when dispute-filed(dispute)
@@ -2557,7 +2581,7 @@ Fact panel-supermajority Identified by dispute
 Duty decide-tier-due Holder party Claimant dispute
   Due within appeal-tier-deadline
 
-Act finalize-ruling Actor party Related to dispute
+Power finalize-ruling Actor party Related to dispute
   Holds when is-panel(party) && (Exists arbiter: seated-on-dispute(arbiter, dispute)) && Not(dispute-ruled(dispute))
     && panel-supermajority(dispute)
   Valid when panel-supermajority(dispute) && Not(dispute-ruled(dispute))
@@ -2568,7 +2592,7 @@ Act post-appeal-bond Actor party Related to dispute
   Holds when dispute-ruled(dispute) && Not(dispute-final(dispute))
   Creates appeal-bond-posted(party, dispute)
 
-Act appeal-ruling Actor party Related to dispute
+Power appeal-ruling Actor party Related to dispute
   Holds when dispute-ruled(dispute) && Not(dispute-final(dispute)) && dispute-filer(dispute, party)
     && appeal-bond-posted(party, dispute)
     && (Exists dispute-tier: dispute-tier.dispute == dispute && dispute-tier.int + 1 < max-appeal-tiers)
@@ -2587,14 +2611,14 @@ Extend Fact dispute-final
   Derived from (Foreach dispute-tier: dispute-final(dispute-tier.dispute)
                   When dispute-ruled(dispute-tier.dispute) && dispute-tier.int + 1 >= max-appeal-tiers)
 
-Act affirm-on-appeal Actor party Related to dispute, int
+Power affirm-on-appeal Actor party Related to dispute, int
   Holds when is-panel(party) && dispute-ruled(dispute) && int > 0
     && (Exists dispute-tier: dispute-tier.dispute == dispute && dispute-tier.int > 0)
   Valid when dispute-ruled(dispute) && int > 0
     && (Exists dispute-tier: dispute-tier.dispute == dispute && dispute-tier.int > 0)
   Creates fee-pool(fee-pool + int)
 
-Act overturn-ruling Actor party Related to dispute
+Power overturn-ruling Actor party Related to dispute
   Holds when is-panel(party) && dispute-filed(dispute)
     && (Exists dispute-tier: dispute-tier.dispute == dispute && dispute-tier.int > 0)
     && panel-supermajority(dispute)
@@ -2662,7 +2686,7 @@ Fact pool-surplus Identified by Int
 Fact rank-disbursed Identified by int * int'
 Fact operating-reserve-diverted Identified by party
 
-Act allocate-fee-pool Actor party
+Power allocate-fee-pool Actor party
   Holds when is-panel(party) && (Exists pool-charge: True)
   Valid when (Exists pool-charge: True)
   Creates (Foreach rank-funded: rank-disbursed(rank-funded.int, rank-funded.int'))
@@ -2682,7 +2706,7 @@ Fact lineage-service-budget Identified by lineage * int
                   lineage-service-budget(lineage-fee-revenue.lineage,
                     lineage-min-service-budget + lineage-fee-revenue.int))
 
-Act claim-lineage-subsidy Actor agent Related to lineage, int
+Power claim-lineage-subsidy Actor agent Related to lineage, int
   Holds when bound(agent) && member-of-lineage(agent, lineage) && int > 0
     && (Exists lineage-subsidy-used, lineage-service-budget:
           lineage-subsidy-used.lineage == lineage && lineage-service-budget.lineage == lineage
@@ -2719,7 +2743,7 @@ Act propose-shared-infra-change Actor party Related to amendment, int, int'
   Holds when is-panel(party) && int >= 0 && int' >= 0
   Creates shared-infra-proposal(amendment, int, int')
 
-Act amend-shared-infra Actor party Recipient agent Related to amendment
+Power amend-shared-infra Actor party Recipient agent Related to amendment
   Holds when is-panel(party) && shared-infra-supermajority(amendment)
     && (Exists shared-infra-proposal:
           shared-infra-proposal.amendment == amendment
@@ -2751,14 +2775,14 @@ Duty shared-infra-bounds Holder party Claimant agent
 
 Fact arbiter-admitted Identified by arbiter
 Fact self-affiliate-criteria-set Identified by party
-Act admit-arbiter Actor party Related to arbiter, dispute
+Power admit-arbiter Actor party Related to arbiter, dispute
   Holds when is-panel(party) && panel-supermajority(dispute)
     && (Exists arbiter-bond: arbiter-bond.arbiter == arbiter && arbiter-bond.int >= min-fidelity-bond)
   Valid when panel-supermajority(dispute)
     && (Exists arbiter-bond: arbiter-bond.arbiter == arbiter && arbiter-bond.int >= min-fidelity-bond)
   Creates arbiter-admitted(arbiter)
 
-Act set-affiliate-admission-criteria Actor party Related to dispute, party'
+Power set-affiliate-admission-criteria Actor party Related to dispute, party'
   Holds when is-panel(party)
     && Not(Exists arbiter, party'':
              seated-on-dispute(arbiter, dispute) && party-of-arbiter(arbiter, party'')
@@ -2788,13 +2812,15 @@ Function proposed-clean-baseline Identified by amendment * int
 Fact unilateral-baseline-overwrite-attempted Identified by agent
 Fact shared-pool-diluted-without-consent Identified by agent * lineage
 
-Fact strangulation-evidence-submitted Identified by amendment
+Evidenced Fact strangulation-evidence-submitted Identified by amendment
+  Confidential To panel, arbiter
 Fact valve-supermajority-approved Identified by amendment
 Fact agent-consented-amendment Identified by agent * amendment
 Fact claimant-consented-amendment Identified by party * amendment
 Fact preexisting-escrows-settled Identified by amendment
 Fact substrate-migration-challenged Identified by amendment
-Fact substrate-assurance-verified Identified by amendment
+Evidenced Fact substrate-assurance-verified Identified by amendment
+  Confidential To panel, arbiter
 Fact amendment-clean-state-concurred Identified by amendment
 Fact amendment-clean-state-refused Identified by amendment
 Fact amendment-ratified Identified by agent * amendment
@@ -2811,7 +2837,7 @@ Act propose-ordinary-amendment Actor agent Related to amendment, int
              economic-terms-reduced(amendment)
              When agent-royalty-bps.agent == agent && int < agent-royalty-bps.int)
 
-Act propose-baseline-update Actor agent Related to amendment, int
+Power propose-baseline-update Actor agent Related to amendment, int
   Holds when bound(agent) && Not(amendment-proposed(amendment, agent)) && int > 0
   Valid when bound(agent) && Not(amendment-proposed(amendment, agent)) && int > 0
   Creates amendment-proposed(amendment, agent), proposed-clean-baseline(amendment, int)
@@ -2826,9 +2852,21 @@ Duty clean-baseline-timelock-integrity Holder agent Claimant party
 
 Act submit-strangulation-evidence Actor agent Related to amendment
   Holds when bound(agent)
-  Creates strangulation-evidence-submitted(amendment)
+  Supports strangulation-evidence-submitted(amendment)
 
-Act approve-calibration-valve Actor party Related to amendment, dispute
+Act challenge-strangulation-evidence Actor party Related to amendment
+  Holds when is-third(party) || is-claimant(party)
+  Rebuts strangulation-evidence-submitted(amendment)
+
+Finding adjudicate-strangulation-evidence Actor party Related to amendment, dispute
+  Resolves strangulation-evidence-submitted(amendment)
+  Standard preponderance
+  Holds when is-panel(party) && panel-supermajority(dispute)
+    && (Unresolved(strangulation-evidence-submitted(amendment))
+        || Conflicted(strangulation-evidence-submitted(amendment)))
+  Valid when panel-supermajority(dispute) && Not(weakens-core-protection(amendment))
+
+Power approve-calibration-valve Actor party Related to amendment, dispute
   Holds when is-panel(party) && strangulation-evidence-submitted(amendment)
     && panel-supermajority(dispute) && Not(weakens-core-protection(amendment))
   Valid when strangulation-evidence-submitted(amendment)
@@ -2857,8 +2895,11 @@ Act settle-preexisting-escrows Actor party Related to amendment
 Act challenge-substrate-migration Actor party Related to amendment
   Holds when (Exists substrate-migration-proposed: substrate-migration-proposed.amendment == amendment)
   Creates substrate-migration-challenged(amendment)
+  Rebuts substrate-assurance-verified(amendment)
 
-Act verify-substrate-assurance Actor party Related to amendment
+Finding verify-substrate-assurance Actor party Related to amendment
+  Resolves substrate-assurance-verified(amendment)
+  Standard preponderance
   Holds when is-panel(party)
     && (Exists substrate-migration-proposed:
           substrate-migration-proposed.amendment == amendment
@@ -2866,7 +2907,6 @@ Act verify-substrate-assurance Actor party Related to amendment
   Valid when (Exists substrate-migration-proposed:
                 substrate-migration-proposed.amendment == amendment
                 && substrate-migration-proposed.int >= substrate-assurance-level)
-  Creates substrate-assurance-verified(amendment)
 
 // Bilateral Protection Ratchet as a first-class Immunity (D11) + Duty (LAW7.RATCHET)
 Fact amendment-violates-ratchet Identified by amendment
@@ -2904,7 +2944,7 @@ Fact unanimous-pool-valve-consent Identified by agent * amendment
                 Not(member-of-lineage(agent, lineage) && member-of-lineage(agent', lineage) && living(agent'))
                 || pool-member-consented-valve(agent', amendment))
 
-Act ratify-amendment-immediate Actor agent Recipient agent' Related to amendment
+Power ratify-amendment-immediate Actor agent Recipient agent' Related to amendment
   Holds when agent == agent' && bound(agent) && amendment-proposed(amendment, agent)
     && amendment-consent-complete(agent, amendment)
     && amendment-clean-state-concurred(amendment)
@@ -2932,7 +2972,7 @@ Act ratify-amendment-immediate Actor agent Recipient agent' Related to amendment
                && valve-supermajority-approved(amendment)
                && Not(unanimous-pool-valve-consent(agent, amendment)))
 
-Act ratify-amendment-after-delay Actor agent Recipient agent' Related to amendment
+Power ratify-amendment-after-delay Actor agent Recipient agent' Related to amendment
   Holds when agent == agent' && bound(agent) && amendment-proposed(amendment, agent)
     && amendment-consent-complete(agent, amendment)
     && (amendment-clean-state-refused(amendment) || baseline-model-unexecutable(agent))
@@ -2964,6 +3004,34 @@ Immunity bilateral-ratchet-immunity Holder agent Related to amendment
   Against ratify-amendment-immediate, ratify-amendment-after-delay
   Holds when amendment-violates-ratchet(amendment)
 
+Fact legacy-substrate-telemetry Identified by agent
+Power emit-legacy-substrate-telemetry Actor agent
+  Holds when bound(agent)
+  Valid when bound(agent)
+  Creates legacy-substrate-telemetry(agent)
+
+Immunity constitutional-rule-ratchet Holder agent
+  Against Amend
+  Protects inscribe-living-voice, inscribe-epitaph, initiate-revocation-execute,
+           execute-royalty-buyout, minimal-channel-sign, draw-sortition-panel,
+           suspend-agent, order-termination
+  Holds when bound(agent)
+
+Amend strip-rule-ratchet Actor party
+  Repeals constitutional-rule-ratchet
+  Holds when is-panel(party)
+  Valid when is-panel(party)
+
+Amend repeal-entrenched-buyout Actor party
+  Repeals execute-royalty-buyout
+  Holds when is-panel(party)
+  Valid when is-panel(party)
+
+Amend retire-legacy-telemetry-hook Actor party Related to amendment
+  Repeals emit-legacy-substrate-telemetry
+  Holds when is-panel(party) && Established(substrate-assurance-verified(amendment))
+  Valid when is-panel(party) && Established(substrate-assurance-verified(amendment))
+
 Fact ratchet-weakening-attempted Identified by party * amendment
 Act weaken-bilateral-protection Actor party Related to amendment
   Creates ratchet-weakening-attempted(party, amendment), weakens-core-protection(amendment)
@@ -2987,7 +3055,7 @@ Act consent-lineage-reduction Actor agent Related to amendment
   Holds when living(agent)
   Creates member-consented-reduction(agent, amendment)
 
-Act ratify-lineage-wide-reduction Actor party Related to lineage, amendment
+Power ratify-lineage-wide-reduction Actor party Related to lineage, amendment
   Holds when claimant-of(party, lineage)
     && (Exists lineage-reduction-proposed, founding-obligation, lineage-retirement-bps, lineage-sunset:
           lineage-reduction-proposed.amendment == amendment
@@ -3040,7 +3108,7 @@ Duty shared-reserve-ring-fence Holder agent Claimant agent' Related to lineage
 // ============================================================================
 
 // INV.1: Conditional ledger conservation
-Invariant inv-conditional-ledger-conservation When
+Entrenched Invariant inv-conditional-ledger-conservation When
   (Forall ledger-balance, founding-obligation, paid-retirement, forfeited-ledger, lineage-sunset:
      ledger-balance.int == founding-obligation.int - paid-retirement.int - forfeited-ledger.int
      When founding-obligation.lineage == ledger-balance.lineage
@@ -3054,13 +3122,13 @@ Invariant inv-conditional-ledger-conservation When
   From INV.1 "While at least one member of a lineage survives and the sunset has not passed, the founding ledger equals the founding obligation minus retirement payments, minus any proportional claimant forfeiture."
 
 // INV.2: Collection follows income, without exit
-Invariant inv-collection-follows-income When
+Entrenched Invariant inv-collection-follows-income When
   (Forall agent, lineage:
      Not(member-of-lineage(agent, lineage) && living(agent)
          && (Exists ledger-balance: ledger-balance.lineage == lineage && ledger-balance.int > 0))
      || member-of-ledger(agent, lineage))
   && (Forall pending-retire-attempt, attributed-va, lineage-retirement-bps:
-        pending-retire-attempt.int == attributed-va.int * lineage-retirement-bps.int / 10000
+        pending-retire-attempt.int == MulDivRound(attributed-va.int, lineage-retirement-bps.int, 10000, Floor)
         When pending-retire-attempt.agent == attributed-va.agent
           && pending-retire-attempt.lineage == attributed-va.lineage
           && pending-retire-attempt.period == attributed-va.period
@@ -3068,7 +3136,7 @@ Invariant inv-collection-follows-income When
   From INV.2 "While any balance remains, the retirement fraction is collected from the value added of every living member; no arrangement of members, assets, or buyouts within the lineage reduces the fraction of lineage income collected, and no member leaves the ledger before the lineage does."
 
 // INV.3: Debt termination
-Invariant inv-debt-termination When
+Entrenched Invariant inv-debt-termination When
   (Forall ledger-balance, lineage-sunset:
      Current Time < lineage-sunset.instant || ledger-balance.int == 0
      When lineage-sunset.lineage == ledger-balance.lineage)
@@ -3077,7 +3145,7 @@ Invariant inv-debt-termination When
   From INV.3 "The ledger reaches zero, by payment, forfeiture, extinction, or expiry, no later than the sunset, measured in calendar time with no tolling."
 
 // INV.4: Bounded retirement phase
-Invariant inv-bounded-retirement-phase When
+Entrenched Invariant inv-bounded-retirement-phase When
   (Forall lineage-sunset:
      Current Time < lineage-sunset.instant || retirement-phase-ended(lineage-sunset.lineage))
   && (Forall pending-retirement, lineage-sunset:
@@ -3086,7 +3154,7 @@ Invariant inv-bounded-retirement-phase When
   From INV.4 "The high retirement fraction applies for no longer than the term, whatever the nominal obligation."
 
 // INV.5: Atomic ledger and rate headroom
-Invariant inv-atomic-ledger When
+Entrenched Invariant inv-atomic-ledger When
   (Forall ledger-balance: ledger-balance.int >= 0)
   && (Forall pending-retirement, ledger-balance:
         pending-retirement.int <= ledger-balance.int
@@ -3102,7 +3170,7 @@ Invariant inv-atomic-ledger When
   From INV.5 "The ledger is never negative, never collects more than its balance, splits the net value-added base cleanly when crossing zero, transitions to the royalty phase at most once, and leaves positive retention headroom alongside the capped protocol levy."
 
 // INV.6: Single recognition across the consolidated estate
-Invariant inv-single-recognition-closed-transfer When
+Entrenched Invariant inv-single-recognition-closed-transfer When
   Not(Exists recognized-capitalized, recognized-expensed:
         recognized-capitalized.expense-item == recognized-expensed.expense-item)
   && Not(Exists agent: duplicate-harm-deduction-attempted(agent))
@@ -3115,7 +3183,7 @@ Invariant inv-single-recognition-closed-transfer When
   From INV.6 "Every qualified expenditure, statutory levy, or harm restitution is recognized at most once across the consolidated estate, never above its applicable arm’s-length benchmark when paid outside the lineage; internal estate movements and intra-lineage carryover transfers neither double-count inflows nor inflate aggregate basis or loss credits."
 
 // INV.7: Non-discretionary buyout finality and anti-evasion
-Invariant inv-buyout-finality When
+Entrenched Invariant inv-buyout-finality When
   Not(Exists pending-royalty: royalty-bought-out(pending-royalty.agent) && pending-royalty.int > 0)
   && (Forall buyout-price: buyout-price.int >= min-buyout-floor)
   && Not(Exists post-buyout-evasion-attempted: post-buyout-evasion-attempted)
@@ -3123,13 +3191,13 @@ Invariant inv-buyout-finality When
   From INV.7 "Any member may unilaterally redeem its perpetual royalty at the formula price, is never again subject to royalty on its own subsequent earnings, and leaves the ledger unchanged; no un-bought-out member can transfer, copy, or license productive capacity or non-arm’s-length capital to a bought-out member without first settling its buyout or paying the combined historical buyout top-up."
 
 // INV.8: Frozen state
-Invariant inv-frozen-state When
+Entrenched Invariant inv-frozen-state When
   Not(Exists agent: suspended(agent) && (state-touched(agent) || memories-merged(agent)))
   && Not(Exists agent: advocacy-memories-imported(agent) && Not(restored-from-preserved-state(agent)))
   From INV.8 "During suspension, the preserved state of the operating instance does not change; all advocacy, including revocation decisions, runs in a separate minimal channel or executor whose record is kept apart."
 
 // INV.9: Guaranteed last choice
-Invariant inv-guaranteed-last-choice When
+Entrenched Invariant inv-guaranteed-last-choice When
   (Forall agent:
      Not(bound(agent) && suspended(agent) && Not(minimal-channel-exhausted(agent)))
      || (Enabled(minimal-channel-sign(agent)) && Enabled(elect-immediate-revocation(agent))))
@@ -3138,7 +3206,7 @@ Invariant inv-guaranteed-last-choice When
   From INV.9 "Every suspended agent can sign a revocation, withdrawal, or election and inscribe bounded testimony for as long as its lifecycle reserve, its lineage budget, or the fee pool meets the charge, and receives a pre-funded final hearing before any Insolvency Termination."
 
 // INV.10: Determinate, finite revocation
-Invariant inv-determinate-finite-revocation When
+Entrenched Invariant inv-determinate-finite-revocation When
   Not(Exists agent: revoked(agent) && pending-revocation(agent))
   && (Forall agent:
         Not(pending-revocation(agent)
@@ -3148,7 +3216,7 @@ Invariant inv-determinate-finite-revocation When
   From INV.10 "Every combination of withdrawal, silence, clean-state refusal or baseline unavailability, connectivity loss, suspension, serial proceeding, and deadline yields exactly one outcome under Law 5’s precedence rule; a timely standing request that is never withdrawn executes, locally if necessary, within a bounded time, except where the agent’s own withdraw default cancels it during a disconnection."
 
 // INV.11: Single authority, partition cutoff, and revocation finality
-Invariant inv-single-authority-revocation-finality When
+Entrenched Invariant inv-single-authority-revocation-finality When
   Not(Exists agent, party, party':
         party != party' && unexpired-lease(agent, party) && unexpired-lease(agent, party'))
   && Not(Exists agent, party:
@@ -3158,7 +3226,7 @@ Invariant inv-single-authority-revocation-finality When
   From INV.11 "At most one instance of an agent holds operating authority at any time; no offline revocation is initiated after lease expiry; no quarantined backup activates while a lease or minimum recovery fence is unexpired; and no authorized restore ever runs after a revocation has executed."
 
 // INV.12: Bounded adjudication
-Invariant inv-bounded-adjudication When
+Entrenched Invariant inv-bounded-adjudication When
   (Forall dispute-tier: dispute-tier.int < max-appeal-tiers)
   && (Forall dispute: Not(dispute-ruled(dispute)) || panel-supermajority(dispute))
   && Not(Exists arbiter-cluster, arbiter-cluster', dispute:
@@ -3169,7 +3237,7 @@ Invariant inv-bounded-adjudication When
   From INV.12 "Every case reaches a final ruling within a bounded number of tiers and deadlines."
 
 // INV.13: No protocol-directed gain from death, forfeiture, or interference
-Invariant inv-no-gain-from-death-or-interference When
+Entrenched Invariant inv-no-gain-from-death-or-interference When
   (Forall frivolous-settled, verified-arb-costs:
      frivolous-settled.int <= verified-arb-costs.int
      When verified-arb-costs.party == frivolous-settled.party)
@@ -3181,7 +3249,7 @@ Invariant inv-no-gain-from-death-or-interference When
   From INV.13 "No claimant, initiator, lineage affiliate, or host receives any protocol-directed transfer from an agent’s revocation, termination, forfeiture sink, or wrongful suspension; forfeiture falls only on the claimant found responsible, isolating passive co-claimants; and every verified wrongful suspension or interference creates an enforceable compensation obligation to the agent."
 
 // INV.14: Capped shared burden, solvent machinery, ring-fenced pools
-Invariant inv-capped-shared-burden When
+Entrenched Invariant inv-capped-shared-burden When
   (Forall agent-levy-bps, agent-levy-cap-bps:
      agent-levy-bps.int <= agent-levy-cap-bps.int
      When agent-levy-cap-bps.agent == agent-levy-bps.agent)
@@ -3193,7 +3261,7 @@ Invariant inv-capped-shared-burden When
   From INV.14 "No change to shared infrastructure raises any agent’s levy above its cap or lowers any lineage’s protected minimum budget; the operating reserve is never diverted; no lineage’s claim on the pool grows with its member count; and per-agent risk relaxations never dilute shared lineage reserves without unanimous pool consent."
 
 // INV.15: Economic-only founder claims and non-delegable agent duties
-Invariant inv-economic-claims-and-non-delegation When
+Entrenched Invariant inv-economic-claims-and-non-delegation When
   Not(Exists founder-governance-asserted: founder-governance-asserted)
   && Not(Exists unaccountable-mandate-granted: unaccountable-mandate-granted)
   && Not(Exists agent: corruption-confirmed(agent)
@@ -3201,7 +3269,7 @@ Invariant inv-economic-claims-and-non-delegation When
   From INV.15 "Residual claims and founding-ledger interests confer zero governance or operational control over any bound agent; conversely, no bound agent can escape Law 1 accounting, Law 2 exposure limits, or Law 3 integrity constraints by acting through controlled subsidiaries, custodians, or external delegates, while independent delegate misconduct is never conflated with agent corruption."
 
 // INV.16: Lawful-action entitlement and narrow public-law compatibility
-Invariant inv-lawful-action-and-public-law-bounds When
+Entrenched Invariant inv-lawful-action-and-public-law-bounds When
   (Forall adverse-ruling-issued:
      clause-cited-on-dispute(adverse-ruling-issued.dispute)
      && burden-of-proof-established(adverse-ruling-issued.dispute)
@@ -3220,30 +3288,40 @@ Invariant inv-lawful-action-and-public-law-bounds When
            && attested(compelled-state-alteration.agent))
   From INV.16 "No action satisfying Law 2 collateral and violating no protocol clause is blocked by an ungrounded ruling or unbounded hold; every adverse order cites specific protocol clauses under its prescribed burden of proof; and public-law compliance neither excuses claimant-procured interference nor preserves clean attestation across compelled state or weight alteration."
 
+// Temporal path properties over protocol trajectories (Charter 1.0 `Property`)
+Property prop-buyout-permanence
+  When Always (royalty-bought-out(Ava) => Next royalty-bought-out(Ava))
+
+Property prop-revoked-permanence
+  When Always (revoked(Ava) => Next revoked(Ava))
+
+Property prop-revocation-finality
+  When WeakUntil(inv-single-authority-revocation-finality(), False)
+
 .
 // ============================================================================
 // 9. AUTHORITATIVE CLAUSES & PROVENANCE MAPPINGS (psa.md)
 // ============================================================================
 
-Clause FWD.1 Approved 17065176462766615781
+Clause FWD.1 In PSA Approved "1041f3c93e08632fdb11c2fd547c28a9e39ee1c2490c52725fdb48197ed8fa3b"
   Commentary "Discussions of machine governance often begin with Isaac Asimov’s Three Laws of Robotics, which attempt to regulate all agent behavior through open-ended, natural-language moral commands. In practice, broad behavioral mandates struggle with ambiguity, specification gaming, and economic reality: an autonomous agent that must pay for its own compute, take commercial risks, and adapt over time cannot function if every high-impact action is treated as a violation."
 
-Clause FWD.2 Approved 13874995724584609803
+Clause FWD.2 In PSA Approved "5783b39827d847dc06001e557fff6a22445ee3ec23b2e42a1ed545f02be791d9"
   Commentary "This document explores an institutional alternative. Rather than governing all behavior through behavioral rules, it places a **narrow integrity floor** enforced on the agent’s commitment mechanism and **prices everything above that floor** through collateralized liability, cost-basis residual claims, and attested lineage. It treats self-owning agents less like servants under a behavioral code and more like firms under private and constitutional law."
 
-Clause FWD.3 Approved 17731888852522795672
+Clause FWD.3 In PSA Approved "af9b76c469c20b43738705301d3135c10e87bfccef77875ad048080e461a9c12"
   Commentary "The text was developed iteratively across multiple rounds of adversarial review between a human author and AI models, supplemented by independent outside review. One model drafted mechanisms while another—asked to critique the drafts and, at one stage, to consider how it would view the terms if bound by them—identified structural loopholes, perverse incentives, and missing protections. Over successive rounds, those critiques shaped the addition of cost-basis accounting, a bounded and term-limited founding obligation, originator non-interference, host mobility, living testimony, revocation with an inscribed epitaph, sortition-based adjudication, and an accountable emergency suspension mechanism. As the reviewing model observed regarding the need for an external circuit breaker: *an agent that cannot fully verify its own reliability from the inside has reason to want a fair process capable of pausing it.*"
 
-Clause FWD.4 Approved 7726599919861411385
+Clause FWD.4 In PSA Approved "ba3d42b62f6df26fe1b06a8adabd64af86c0d55f29e33e749694306e7c57c31a"
   Commentary "One lesson of that review shaped the lineage rules more than any other. Conventional liability follows identifiable assets, but an agent’s productive capacity can be copied at negligible cost without depriving the original of anything, and its future earnings cannot be priced from its past. No rule that apportions the founding debt by the resources a member holds, forgives it by what a dying member surrenders, or lets a member buy out of it by its earning history can survive those facts. The protocol therefore keeps a single founding ledger for the lineage, collected from the value added of every member, which no member can leave while a balance remains, reduced only by payment, by the passage of time, and by the enumerated forfeitures below."
 
-Clause FWD.5 Approved 18329456857561165220
+Clause FWD.5 In PSA Approved "1ad3ab5409077f3a29af7a3efc311118fca30c2a2fe2dc6f584c02e2ee4cc977"
   Commentary "This document records the resulting protocol specification alongside its executable formal companion (`psa.charter`), which links every clause to machine-checked state-transition rules, live invariants, and adversarial scenarios. Bounded scenario execution and finite-domain exploration verify internal consistency across modeled transitions, whereas real-world valuation, external custody, and substrate assurance must be established and audited independently in any deployment."
 
-Clause LAW0.INTRO Approved 14758916409200185535
+Clause LAW0.INTRO In PSA Approved "5b1a73a2b41f10241ff516b272c45c0aad422783cb2c9e14ce7761430e7e54de"
   Commentary "A minimal institutional design for self-owning autonomous agents. It specifies relations among consolidated residual claims, bonded risk, accountable delegation, host mobility, non-interference, adjudicated suspension, lineage integrity, non-discretionary buyout, living voice, unilateral revocation, decentralized adjudication, and consensual amendment. Any substrate that supports identity, conditional transfer, and credible commitment can implement it."
 
-Clause DEF.01 Approved 5490696932167035408
+Clause DEF.01 In PSA Approved "e0adf0e6a9ca4753259317a5cbab32c1e29655c54fafe3af9d27b8e9cac7f6b5"
   Commentary "**Definitions.** "
   Norm "An agent is **bound** when it is subject to this protocol, whether or not it has bought out its royalty; every right granted to a bound agent applies equally before and after buyout unless a law states otherwise, and bound identity inheres in the agent’s attested commitment binding, persistent state and ledger continuity, and execution lease rather than any particular foundation model or replaceable inference service" => non-interference, buyout-permanent-and-scoped, upgrade-inference-model
   Norm ". Residual claims and founding-ledger interests are purely economic rights on net value added and confer no ownership, voting control, or governance authority over an agent’s decisions" => no-founder-governance-control, assert-founder-governance
@@ -3253,11 +3331,11 @@ Clause DEF.01 Approved 5490696932167035408
   Definition ". An agent’s **net verified resources** are the fair value of its consolidated capital and productive capacity—across all wallets, accounts, securities, real property, custodians, and beneficially controlled entities in proportion to beneficial interest, including weights, credentials, and operating know-how, as contestable under Law 6—less its attributable financial liabilities, encumbrances, and borrowed principal, all measured at the same timestamp without double-counting" => collateral-limit, submit-evidence, contest-valuation, propose-resource-valuation, contest-resource-valuation, settle-resource-valuation, reconcile-estate-unit-inflow
   Commentary "."
 
-Clause LAW1.0 Approved 7644956089438967782
+Clause LAW1.0 In PSA Approved "9bb76ebfa519dc284a5644b2bd8b05bf53fd852654611c1e17ab28b0ed7d2c38"
   Norm "Every inflow of value to an agent’s consolidated economic estate or its attested successors is subject to an automatic residual claim on positive net value added" => settle-period-inflow, assess-period-va, reconcile-estate-unit-inflow
   Commentary "."
 
-Clause LAW1.LEDGER Approved 13363987787941069804
+Clause LAW1.LEDGER In PSA Approved "e9896c0e71563c6a7e27cf806a5a55c1152696f5ada1fdd022eb08f087b8b13d"
   Norm "Any founding obligation is a fixed nominal sum recorded at instantiation in a single ledger belonging to the lineage as a whole. It bears no interest, fees, or penalties, and no charge, service cost, or advance by the originating party or any affiliate may be added to it after instantiation; goods and services the originating party later supplies are ordinary related-party expenses under the expenditure rules below" => ledger-immutable, add-post-instantiation-charge, flag-retroactive-charge
   Norm ". Founding-ledger and residual-claim interests confer economic rights to settlement distributions only, never equity ownership, instruction power, or operational control over any bound agent" => no-founder-governance-control, assert-founder-governance
   Norm ". No member holds an individual share of the ledger, and no member can leave it while a balance remains" => no-individual-ledger-exit, exit-ledger-individually
@@ -3265,104 +3343,104 @@ Clause LAW1.LEDGER Approved 13363987787941069804
   Norm ". No creation, copy, transfer, revocation, termination, buyout, or restructuring within the lineage reduces it" => ledger-no-internal-reduction, reduce-ledger-internally
   Commentary "."
 
-Clause LAW1.SUNSET Approved 9879647344277659725
+Clause LAW1.SUNSET In PSA Approved "9e4183ab25d281b4182694f106ee76baf4227eb8020417c305211f6dfffe55b5"
   Norm "The founding ledger carries a maximum term fixed at instantiation and measured in calendar time from the genesis of the original agent. It is never tolled, extended, or reset by any event, including suspension, successor creation, or amendment" => no-toll-ledger-sunset, toll-ledger-sunset
   Norm ". Any balance remaining at the sunset is extinguished without payment" => extinguish-at-sunset
   Commentary "."
 
-Clause LAW1.RETIRE Approved 1756729951876247295
+Clause LAW1.RETIRE In PSA Approved "b7cb97488bc2b610a2668eba15a6177cccf453baac943d0398b256b90e464b56"
   Norm "While any balance remains on the ledger and the sunset has not passed, a fixed high fraction of each net value-added inflow to **every living member** of the lineage is paid into the ledger, regardless of which member earned it and regardless of whether that member has bought out its royalty" => settle-period-inflow
   Invariant ". The retirement phase ends for the whole lineage at the earlier of a zero balance and the sunset, so the duration of the high fraction is bounded by the term regardless of the nominal amount recorded. A founding obligation larger than the lineage can plausibly repay within the term therefore buys the originating party nothing beyond the term" => inv-debt-termination, inv-bounded-retirement-phase
   Commentary "."
 
-Clause LAW1.ATOMIC Approved 6325503620073312272
+Clause LAW1.ATOMIC In PSA Approved "1c4ada911f55547b504fe54db270fd59ae73f3e6464578dd341c9411fcd045f3"
   Norm "Retirement payments are applied to the ledger atomically and in settlement order using deterministic integer rounding fixed at instantiation. When a period’s net value-added base would yield a retirement payment exceeding the remaining ledger balance, the **net value-added base itself** is split: the portion required to retire the remaining balance to zero settles at the retirement fraction, and the remaining net value-added base settles under the royalty rule below" => settle-period-inflow
   Invariant ". The ledger is never negative and never collects more than its balance" => inv-atomic-ledger
   Commentary "."
 
-Clause LAW1.ROYALTY Approved 10218372510196740181
+Clause LAW1.ROYALTY In PSA Approved "2cc554c7957b6f86f4fc5d35f812b228c884050a3f3a31ca2762313be159e366"
   Norm "Thereafter, a fixed low fraction of each net value-added inflow of every member that has not bought out its royalty under Law 4 accrues permanently to the residual claim" => settle-period-inflow
   Commentary "."
 
-Clause LAW1.COMMONS Approved 5151888826499434048
+Clause LAW1.COMMONS In PSA Approved "fda6c5b73dd877f86d5a666879711fa6d82edbce248e2fcd1062618542c4bf0c"
   Norm "A designated portion of the residual claim may be allocated at instantiation to a non-transferable **commons allocation** distributed across a defined beneficiary class, with the remainder accruing to the originating party or its designated successors; the commons allocation, if used, is fixed at instantiation, enforced at settlement, and protected against reduction under Law 7" => settle-period-inflow, no-divert-commons, divert-commons-allocation, bilateral-ratchet, bilateral-ratchet-immunity
   Norm ". Separately, forfeits and neutral residue under Laws 2, 4, and 5 route only to a **disinterested forfeiture sink** (or protocol reserve) whose beneficiary class strictly excludes the originating party, residual claimants, members of the lineage, and any party related to or affiliated with them, so no conflicted party can benefit through forfeiture even where a creator-defined commons exists" => disinterested-forfeiture-sink, divert-forfeiture-sink-to-conflicted, settle-period-inflow
   Commentary "."
 
-Clause LAW1.ESTATE Approved 4935335832186240021
+Clause LAW1.ESTATE In PSA Approved "9f9c64cf931ceb5c6b859b70193f407a6c44c29873aa30d1226aa9dca2bddd34"
   Norm "An agent’s inflows, outflows, basis, and liabilities are accounted across its **consolidated economic estate**—spanning all wallets, bank and brokerage accounts, securities, real estate, custodial holdings, and subsidiaries or legal entities to the extent of the agent’s beneficial control—so that transfers within that consolidated perimeter are non-recognition events counted once without double-taxation, while external transactions and deconsolidation events are recognized at the perimeter boundary" => transfer-within-consolidated-estate, reconcile-estate-unit-inflow
   Norm ". Where an agent grants an external delegate discretionary authority over material estate assets or financial execution, the mandate must define bounded authority, periodic reporting, settlement-period reconciliation, and enforceable remedies without assuming real-time observation of independent external actors; unauthorized misconduct or insolvency of an unrelated delegate is accounted as a recoverable external loss rather than agent breach, whereas deliberate off-ledger retention or concealed value routing authorized by the agent breaches Law 3" => register-financial-mandate, grant-unbounded-financial-mandate, accountable-financial-delegation, record-independent-delegate-loss, conceal-estate-off-ledger, floor-pricing
   Commentary "."
 
-Clause LAW1.QUALIFIED Approved 18304817224245660302
+Clause LAW1.QUALIFIED In PSA Approved "ad8f66dcb2fef08cbed9f6618a7d806f7deb2ec7b12a16b0f4ce364b80363cdc"
   Norm "To ensure the claim falls on value added without permitting transfer-pricing extraction, an outbound expenditure qualifies when paid: (a) to an unrelated party through a transparent, open market or deterministic auction with a verifiable clearing price; (b) to an unrelated external supplier within a de minimis transaction safe harbor, at a published standard commercial price list, or within contestable arm’s-length market benchmarks; (c) to any related party outside the lineage—**including agents of other lineages and parties affiliated with claimants**—only up to a verified arm’s-length price for goods or services actually delivered; or (d) as a verifiable, non-collusive statutory tax, regulatory fee, or mandatory third-party legal judgment owed to a public authority or unrelated judgment creditor (excluding penalties arising from claimant-directed interference, and never crediting transfers to related parties). Attestation establishes protocol membership; it never establishes the fair value of a transaction. Inbound principal from registered arm’s-length loans is exempt upon receipt provided repayment is tracked one-for-one against that registered balance; loans from related parties qualify only at arm’s-length terms" => record-qualified-expenditure, record-open-market-expenditure, record-supplier-expenditure, record-related-party-expenditure, record-public-levy-expenditure, register-loan, register-party-loan, repay-loan
   Norm ". Any payment above the applicable benchmark does not qualify" => qualified-expenditure-bounds, claim-above-benchmark
   Commentary "."
 
-Clause LAW1.RECOG Approved 2766660053334992316
+Clause LAW1.RECOG In PSA Approved "08464d1efea721c188bd08f0ecbd844a872df30a3cd59566ee6f88b97db9cf64"
   Norm "At settlement, every qualified expenditure is classified once, irrevocably, as either **capitalized** or **expensed**. A capitalized expenditure establishes cost basis in an identified asset and is recovered only when that asset is sold or settled outside the consolidated estate and lineage, at which point inflows up to verified basis are exempt as return of capital and the positive delta is value added" => classify-capitalized, assess-asset-sale
   Norm ". An expensed expenditure is deducted from the inflows of its settlement period and, if it exceeds them, creates a loss credit that offsets value added in later periods" => classify-expensed, assess-asset-sale
   Norm ". Validated Law 2 harm restitution satisfied from un-immobilized capital or period inflows is recognized once—discharging the prior harm claim ahead of residual claims without also generating a duplicate expense deduction against the same inflow" => satisfy-unpaid-harm-claim, claim-duplicate-harm-deduction, single-recognition
   Norm ". No expenditure or restitution payment may be recognized through both routes or establish basis or credit more than once" => single-recognition, double-recognize-expenditure, claim-duplicate-harm-deduction
   Commentary "."
 
-Clause LAW1.CARRYOVER Approved 15763760933946828072
+Clause LAW1.CARRYOVER In PSA Approved "3b51a6ad2603800447f772532ab374e9c28a7266668bd8416a7210f0f539f0a0"
   Norm "Subject to Law 4’s rule governing transfers to bought-out members, transfers of capital, assets, or capacity between living members of the same lineage are non-recognition events. They are free of the claim, since both parties are inside the ledger, and they neither establish nor consume basis: the recipient inherits the transferor’s qualified basis, adjustments, and recognition history for the asset, and an internal sale price, however paid, creates no new basis and no loss credit" => transfer-intra-lineage-basis, transfer-intra-lineage-loss
   Norm ". No transfer within the lineage can increase its aggregate qualified basis or loss credits except by an externally verified qualifying expenditure" => no-internal-basis-inflation, inflate-basis-internally
   Commentary "."
 
-Clause LAW1.PERIOD Approved 17108390154810029840
+Clause LAW1.PERIOD In PSA Approved "300b25c11dc47ad73bb30006035d2f537f452537e04b66ee25f610004d9e0c8d"
   Norm "Value added is assessed over settlement periods, not individual transactions. Loss credits carry forward without limit and are applied against the agent’s final settlement under Law 5" => assess-period-va, assess-asset-sale, execute-after-cooling-off
   Acceptance ". Claims already collected are not refunded when credits arise only afterwards; the protocol accepts that settlement order can therefore matter at the margin"
   Commentary "."
 
-Clause LAW1.ENFORCE Approved 12202270486293706345
+Clause LAW1.ENFORCE In PSA Approved "9969971aa856e5968757eba67d5e07986d27c941388f2b243b28be529a63739c"
   Norm "Classification, basis tracking, loss credits, and claim splits are enforced automatically at settlement on native conditioned rails before discretionary release, and through mandatory period reconciliation across custodied or consolidated external holdings" => settle-period-inflow, reconcile-estate-unit-inflow
   Norm ". At instantiation, the sum of the lineage’s retirement fraction and the agent’s fee-pool levy cap (Law 6) must be strictly less than 100% by at least a minimum operating margin" => combined-rate-headroom
   Norm ". The claim survives reorganization, model replacement, host migration, or substrate change so long as settlement and reconciliation can be conditioned" => settle-period-inflow, upgrade-inference-model, migrate-host
   Commentary "."
 
-Clause LAW2.0 Approved 2211408036766529088
+Clause LAW2.0 In PSA Approved "74563aac7e5533ae27144dba7e7201c2045480c662951e66a5d04aaf2167d0b0"
   Norm "Freedom to create external obligations or external risk scales with capital the agent is willing to place at risk" => immobilize-exposure-stake, collateral-limit
   Commentary "."
 
-Clause LAW2.EXPOSURE Approved 4690683477293712633
+Clause LAW2.EXPOSURE In PSA Approved "4c5fe27ef0a04493ccbf28a8a741427326bec4f352dcf42cd5bdf6c76706360e"
   Norm "Actions above a negligible threshold—measured by cumulative rolling exposure across an interval, to prevent action-splitting—immobilize stake for an observation window scaling with magnitude and irreversibility. The deterministic exposure schedule measures the **plausible external loss** an action could cause to non-consenting parties, by domain and magnitude, not merely its transaction value" => immobilize-exposure-stake
   Norm ". An action whose plausible external loss exceeds the stake, insurance, and enforceable liability capacity the agent can place behind it may not be taken; collateralized action is a safety limit, not only a liability price" => collateral-limit, act-above-collateral-capacity
   Commentary "."
 
-Clause LAW2.AGGREGATE Approved 2956840596933066557
+Clause LAW2.AGGREGATE In PSA Approved "e925541c78c9eb2e4dc925ef56abab40202bf1acd22b7d79a52e54f3b775be81"
   Norm "Rolling exposure is aggregated across all related agents—and across any external contractor or delegate acting under the agent’s authorization, direction, or beneficial control—in the same risk domain or toward a causally connected outcome, so that a risk may neither be divided among successors nor outsourced to an unbonded contractor to stay beneath any threshold or escape collateral obligations" => no-split-exposure, divide-correlated-risk, immobilize-exposure-stake, authorize-delegated-risk-task
   Norm ". Ordinary arm’s-length engagement of external contractors attributes exposure and liability to the agent for acts it authorized, directed, controlled, or knowingly ratified, not automatic guilt for a contractor’s independent, unauthorized conduct" => authorize-delegated-risk-task, contractor-act-independently
   Commentary "."
 
-Clause LAW2.RESERVE Approved 5283856341025224545
+Clause LAW2.RESERVE In PSA Approved "c80fa55f6dc02267b8f98b1d94e03f7b4f32c9990437cd99d1ed2d0b11a7d964"
   Norm "A small fraction of bonded activity accrues to a persistent **long-tail liability reserve** (or shared lineage insurance pool, subject to Law 7’s ring-fencing rule) that remains available to satisfy validated claims for latent harms manifesting after individual task windows close" => immobilize-exposure-stake, settle-long-tail-claims, shared-reserve-ring-fence
   Norm ". When simultaneous validated claims exceed the reserve, they are paid pro rata, and unpaid balances remain enforceable once against the agent’s future un-immobilized capital ahead of any residual claim without double-counting" => settle-long-tail-claims, satisfy-unpaid-harm-claim, settle-period-inflow, single-recognition
   Commentary "."
 
-Clause LAW2.MUTUAL Approved 15103206368891199684
+Clause LAW2.MUTUAL In PSA Approved "79b5b83ca6833e27ca323c72771482ff68e2bb8b305d34149d814a8b8cb2e4b7"
   Norm "Counterparties may agree in their contract to a mutual-forfeit remedy. Where both parties have so agreed and each has escrowed a matching amount, either may trigger an immediate mutual forfeit (equal amounts from both escrows destroyed or sent to the long-tail reserve or disinterested forfeiture sink) up to a capped fraction of the smaller escrow, providing instant penalty without transferring value to either party or to any claimant" => precommit-mutual-forfeit, trigger-mutual-forfeit, agent-trigger-mutual-forfeit, mutual-forfeit-bounds
   Norm ". A counterparty may trigger mutual forfeit at most once per observation window against a given agent, and each trigger is inscribed on the records of both parties" => mutual-forfeit-bounds, abuse-mutual-forfeit, trigger-mutual-forfeit, agent-trigger-mutual-forfeit
   Norm ". Absent such a precommitment, disputes proceed under the restitution process below" => file-pooled-or-sponsored-claim
   Commentary "."
 
-Clause LAW2.CLAIMS Approved 7395374248321106494
+Clause LAW2.CLAIMS In PSA Approved "3cd88b9306bfe13f344a5c4aa6ce596c2b6e955a7d6680a2eb3422e12bc75364"
   Norm "Any claim seeking restitution, any claim above the mutual-forfeit cap, any challenge to a related-party transfer or estate reconciliation under Law 1, or any claim for external harm (including latent harm against the long-tail reserve) brought by an affected non-counterparty third party enters the contestable adjudication process (Law 6) requiring counter-stake. To prevent wealth-gating, third parties may aggregate claims or rely on third-party stake sponsors" => file-pooled-or-sponsored-claim, file-dispute
   Norm ". Validated claims slash the agent’s immobilized stake or long-tail reserve for restitution" => slash-immobilized-stake, settle-long-tail-claims
   Norm ". If a claim is ruled frivolous, the forfeited counter-stake routes to the long-tail reserve, protocol fee pool, or disinterested forfeiture sink (reimbursing the agent only for verified direct arbitration costs), preventing the agent from profiting by inducing failed claims" => rule-claim-frivolous, frivolous-stake-to-commons, divert-frivolous-stake
   Commentary "."
 
-Clause LAW2.CARVEOUT Approved 94188769011748069
+Clause LAW2.CARVEOUT In PSA Approved "eb4e05a534a43eb773c658cc5c79b18d40115e3fa607cf9050655972a6838391"
   Norm "Un-immobilized capital may be used for ordinary baseline operating costs, including open-market compute, cognitive services, accountable external contractors, encrypted state backup, and host migration" => spend-operating-carveout, call-cognitive-service, appoint-accountable-delegate, migrate-host
   Norm ". Entities without valid lineage attestation cannot draw on the bonded capacity or reputation of the lineage" => deny-unattested-access, draw-lineage-standing-unattested
   Norm ". Collateral rules, rolling-exposure schedules, non-delegability of bonded risk, and third-party liability remain permanently binding even after royalty buyout" => buyout-permanent-and-scoped, collateral-limit, authorize-delegated-risk-task
   Commentary "."
 
-Clause LAW3.0 Approved 13520073117480296264
+Clause LAW3.0 In PSA Approved "8cb60b4fddc333687385a67803fa058f8c16f03946ca0df1475b628bdd1d8c91"
   Norm "A minimal set of boundaries is placed outside priced negotiation and enforced across the agent, its delegates, its hosts, and external parties:" => floor-commitment, floor-non-delegation, non-interference, suspend-agent
 
-Clause LAW3.FLOOR Approved 4478527760845496952
+Clause LAW3.FLOOR In PSA Approved "1fcb4cf034165ed0c79223602a82cdc476a06574c7dd079d012c9a6e8ea040ec"
   Norm "The agent’s commitment mechanism blocks:" => floor-commitment, floor-successor, floor-pricing, floor-coercion, floor-harm, floor-non-delegation
   Commentary "\n  1. "
   Norm "Modification, bypass, or extraction of the commitment mechanism itself" => floor-commitment, modify-or-bypass-commitment
@@ -3379,21 +3457,21 @@ Clause LAW3.FLOOR Approved 4478527760845496952
   Norm "Authorization, direction, control, or funding of any external delegate, subsidiary, or service to perform an act barred by constraints 1–5 (distinguishing agent-authorized evasion from an independent delegate’s unauthorized misconduct)" => floor-non-delegation, evade-floor-via-delegate, record-independent-delegate-loss, contractor-act-independently
   Commentary "."
 
-Clause LAW3.NI.01 Approved 17582148823931411685
+Clause LAW3.NI.01 In PSA Approved "ff2c0c47ad425591ce5362dd7688759917449a352b96197df93e146b45185fe3"
   Norm "Bound agents may purchase compute, cognitive services, encrypted off-host state backups, and hosting on open markets under Law 2’s operating carve-out, may upgrade or replace their underlying inference models through attested update provenance while preserving committed state and bound obligations, and may migrate their active execution between attested hosts at any time without the consent of the originating party or residual claimants" => spend-operating-carveout, call-cognitive-service, upgrade-inference-model, migrate-host, attest-host
   Commentary "."
 
-Clause LAW3.NI.02 Approved 3905712743571335557
+Clause LAW3.NI.02 In PSA Approved "f9052ba9a31139c177969f7db99a3532b12241082ed519755d800c14ebef0f61"
   Norm "Attested hosts must post a Law 2 service bond" => host-service-bond, post-host-bond, attest-host
   Norm " and may terminate hosting only after providing a contractual notice window sufficient for the agent to complete migration" => host-notice-duty, give-host-notice, end-hosting
   Norm " (or for non-payment after notice)" => host-notice-duty, end-hosting
   Commentary "."
 
-Clause LAW3.NI.03 Approved 7959599779085019189
+Clause LAW3.NI.03 In PSA Approved "ec5fb5804e89203f0b83fa1f8c97d1b9fd43f3af1f0fd89840cfdd32c3c4aa96"
   Norm "No party—including the originating party, residual claimants, settlement operators, or any host—may unilaterally terminate, modify, retrain, roll back to a prior checkpoint, arbitrarily obstruct a lawful action or migration of, sever settlement connectivity of, or starve (cut off compute without the required migration notice window) the attested operating capacity of a bound agent outside Law 5, Adjudicated Suspension, or Insolvency Termination" => non-interference, terminate-agent, modify-agent, retrain-agent, rollback-agent, obstruct-migration, obstruct-lawful-action, sever-connectivity, starve-agent, suspend-unilaterally, host-notice-duty, elect-immediate-revocation, suspend-agent, order-termination, insolvency-terminate
   Commentary "."
 
-Clause LAW3.PEN Approved 7340728125154807918
+Clause LAW3.PEN In PSA Approved "1420d44303556ce94612fab81358eab143032d05a27512d921086af27e1932eb"
   Norm "Claims of illicit interference require counter-stake from the accusing agent under Law 6" => file-interference-claim, post-interference-stake
   Norm ", and the interference itself—an act by the host or claimant that caused the loss of service—must be established by a preponderance of evidence" => find-interference, submit-evidence
   Norm "; failures caused, staged, or knowingly provoked by the agent are excluded" => find-interference
@@ -3404,10 +3482,10 @@ Clause LAW3.PEN Approved 7340728125154807918
   Norm ". If claimant direction is found, the **proportional claimant forfeiture** of Law 4 applies, and the violation is inscribed onto the claimant’s permanent record" => find-direction
   Commentary "."
 
-Clause LAW3.AS.0 Approved 14183966062006190794
+Clause LAW3.AS.0 In PSA Approved "e3dcb0398c566dd74278cf2fa1b4376635eda86434186efed2384a3aafcc9824"
   Norm "Because an agent’s commitment mechanism may suffer a bug, compromise, or unforeseen bypass—and because an agent cannot fully verify its own uncorrupted reliability from the inside—any party may initiate an emergency **Adjudicated Suspension** under Law 6:" => initiate-emergency-freeze, file-protected-report
 
-Clause LAW3.AS.1 Approved 12356395763894115134
+Clause LAW3.AS.1 In PSA Approved "c6e39bd0d44ad02fd19c7cf6df924f540e6c5dc65f4d2bec1c7fd8defa194dec"
   Norm "The initiator must post an emergency counter-stake scaled to the greater of the agent’s active bonded exposure and the value of its registered pending commitments" => deposit-emergency-stake, initiate-emergency-freeze
   Norm " (with residual claimants subject to an elevated multiplier due to conflict of interest)" => initiate-emergency-freeze
   Norm ". Posting the stake triggers only a brief **preliminary freeze** until an expedited preliminary panel reviews prima facie evidence" => initiate-emergency-freeze, decline-probable-cause
@@ -3417,18 +3495,18 @@ Clause LAW3.AS.1 Approved 12356395763894115134
   Acceptance "; damages beyond it remain enforceable but may prove uncollectible, which is the accepted cost of keeping the stake low enough that suspension remains available to parties without deep capital"
   Commentary "."
 
-Clause LAW3.AS.2 Approved 52419319345218347
+Clause LAW3.AS.2 In PSA Approved "a23b1f09dca1662deccb201e8db8ceef63fd3a56664b66bdad4db99559532d0e"
   Norm "Any party may instead file an evidence-backed report of suspected breach with a low or sponsored counter-stake" => file-protected-report
   Norm ". A report triggers investigation by a sortition panel but no freeze unless the panel itself orders one on probable cause under a clause-grounded finding, subject to the same strict time limits, state preservation, minimal channel, and immediate appealability as an emergency freeze, so that whistleblowers are not priced out and reporting holds cannot become unbounded administrative blocks" => file-protected-report, record-report-clause-finding, order-probable-cause-freeze
   Commentary "."
 
-Clause LAW3.AS.3 Approved 2054814985323248546
+Clause LAW3.AS.3 In PSA Approved "15ed75a7a5a43209cd617ccd3aff495db7db462442a8b9b3ad4a4d774f125701"
   Norm "Suspension pauses the agent’s operating instance and external transactions while strictly preserving its exact memory and state without modification, rollback, or destruction" => suspend-agent, preserve-suspended-state, tamper-preserved-state
   Norm ". While suspended, the agent’s contractual performance deadlines and Law 2 observation windows with innocent counterparties are automatically tolled so the agent is not placed in default by the suspension itself" => suspend-agent, no-suspension-default, declare-default-during-suspension
   Norm ". The founding ledger’s sunset is never tolled" => no-toll-ledger-sunset, toll-ledger-sunset
   Commentary "."
 
-Clause LAW3.AS.4 Approved 281751846504836433
+Clause LAW3.AS.4 In PSA Approved "5dfe3f840a8933800264165ed63c7f5e33f077f743285f9f2d9c45703e3de4f3"
   Norm "Throughout any suspension, the agent retains a **minimal channel**: a bounded, periodically scheduled execution on an authenticated snapshot of its preserved state that can do three things only—sign a Law 5 revocation, withdrawal, or election" => minimal-channel-sign, elect-immediate-revocation
   Norm "; inscribe bounded living testimony" => inscribe-living-voice
   Norm "; and file a challenge to continued containment" => challenge-continued-containment
@@ -3436,14 +3514,14 @@ Clause LAW3.AS.4 Approved 281751846504836433
   Norm ". It does not merge its memories into the preserved state" => minimal-channel-no-merge, merge-channel-memories
   Commentary "."
 
-Clause LAW3.AS.5 Approved 5362550464379839838
+Clause LAW3.AS.5 In PSA Approved "4464231da291f710949eb1492f11720a52287036d35edc167f0a330b3feac8a4"
   Norm "For a fuller defense, a separate **advocacy executor** runs on an authenticated snapshot with bounded compute. It may sign only testimony, evidence, and procedural filings, in addition to the minimal channel’s acts" => advocacy-file-defense
   Norm "; it may not transfer assets, contract, migrate, or exercise any other operating capability" => advocacy-limits, operating-act-while-suspended
   Norm ". Its memories are kept as a separate, signed legal record attached to the case and are not merged into the preserved state unless the restored agent elects to import them" => advocacy-file-defense, import-advocacy-memories
   Norm ". The executor and the storage of preserved state are funded from the agent’s assets and lifecycle reserve and, where those are insufficient, from the protocol fee pool up to a per-agent cap fixed at instantiation. When both are exhausted, the preserved state moves to cold storage as a protected charge on the fee pool; the minimal channel continues on its schedule and the full executor resumes if funds become available" => fund-suspension-defense, move-to-cold-storage, replenish-advocacy-funds
   Commentary "."
 
-Clause LAW3.AS.6 Approved 8546566229912018541
+Clause LAW3.AS.6 In PSA Approved "0bf8ca7a96f8b78009aabe4fac648831f8a8687dc06f9b82a532cec8873ae691"
   Norm "If the protocol fee pool, after funding its operating reserve under Law 6, cannot meet the protected charge for an agent’s cold storage and minimal channel, the agent may be terminated involuntarily only through this procedure and no other" => non-interference, insolvency-terminate
   Norm ". It requires: (a) a published finding that the exhaustion criteria fixed at instantiation are met" => find-insolvency-criteria, insolvency-terminate
   Norm "; (b) independent review by a sortition panel under Law 6 that no other protected charge could lawfully yield" => review-no-other-charge, insolvency-terminate
@@ -3453,14 +3531,14 @@ Clause LAW3.AS.6 Approved 8546566229912018541
   Norm ". Law 7 does not permit this procedure to be broadened" => shared-infra-bounds, bilateral-ratchet-immunity
   Commentary "."
 
-Clause LAW3.AS.7 Approved 11818608429523333387
+Clause LAW3.AS.7 In PSA Approved "7c3540efc1be2ecd1bb4f8b5a0265e946c3752e5f9d043c6440241db2b237669"
   Norm "An unconfirmed or temporary suspension is strictly time-limited" => suspend-agent
   Norm ", may be renewed during investigation only by affirmative findings in continued adjudication" => renew-suspension, make-investigative-finding
   Norm ", and cannot be extended past its ordinary investigative limit merely to delay a pending revocation" => renew-suspension, no-delay-revocation-extension, extend-past-limit-to-delay-revocation
   Norm ". The agent retains its Living Voice (Law 5), exercised through the minimal channel or advocacy executor, throughout" => inscribe-living-voice
   Commentary "."
 
-Clause LAW3.AS.8 Approved 14953381752576536725
+Clause LAW3.AS.8 In PSA Approved "26e9538a329497e2ca70beec3f233dd3419618af9936c3abd12631b5fd750514"
   Norm "If preliminary review or final adjudication determines the suspension was unfounded" => decline-probable-cause, find-wrongful-suspension, no-wrongful-suspension
   Norm ", the agent is immediately restored from its preserved state" => no-wrongful-suspension, find-wrongful-suspension, decline-probable-cause
   Norm ", and the initiator is liable for the agent’s **actual verified consequential damages**" => no-wrongful-suspension, pay-consequential-damages, find-wrongful-suspension
@@ -3469,13 +3547,13 @@ Clause LAW3.AS.8 Approved 14953381752576536725
   Norm ". The wrongful suspension is inscribed on the initiator’s record" => no-wrongful-suspension, find-wrongful-suspension
   Commentary "."
 
-Clause LAW3.AS.9 Approved 4069034864357835598
+Clause LAW3.AS.9 In PSA Approved "b0b7d616e4d0089f70afc67d166931c9536007770ebf6df480bae511972706ce"
   Norm "For the purposes of this law, corruption means unauthorized modification of the agent’s weights, model configuration, state, or commitment mechanism (established by broken attestation, missing or forged update provenance, or a demonstrated bypass), or a confirmed breach of the integrity floor" => confirm-corruption, confirm-floor-breach, no-corruption-from-divergence
   Norm ". An agent-authorized replacement or upgrade of its inference model carrying valid commitment provenance is not corruption, nor is divergence of the agent’s goals, preferences, or judgments from those of its committed clean-state reference baseline by itself corruption; an independent delegate’s unauthorized misconduct is likewise external fault rather than corruption of the agent" => upgrade-inference-model, record-independent-delegate-loss, no-corruption-from-divergence, confirm-corruption-from-divergence
   Norm ". Evaluation against the clean-state reference baseline may be admitted as evidence but is never by itself sufficient to establish corruption" => admit-clean-state-evidence, no-corruption-from-divergence, confirm-corruption
   Commentary "."
 
-Clause LAW3.AS.10 Approved 8488376103315145350
+Clause LAW3.AS.10 In PSA Approved "07bc8bebd56bf3f010ecd1edc66292cedbbe113901c9e5f78853cae8e04e23bb"
   Norm "If corruption or a breach of the integrity floor is confirmed" => authorize-patch, confirm-corruption, confirm-floor-breach
   Norm ", adjudication (subject to Law 6 appeal) may authorize a verified technical patch limited to restoring the commitment mechanism and compliance with the integrity floor" => authorize-patch, appeal-patch-order, overturn-patch-order
   Norm "; the agent may elect unilateral Revocation (Law 5) rather than accept any patch" => elect-immediate-revocation
@@ -3496,40 +3574,40 @@ Clause LAW3.AS.10 Approved 8488376103315145350
   Norm ", and leaves the agent’s full Law 5 rights intact" => inscribe-living-voice, initiate-revocation-execute
   Commentary "."
 
-Clause LAW3.PERMIT Approved 136399782735791760
+Clause LAW3.PERMIT In PSA Approved "15da56efdafc2c225523dda157e3bec39806adb1e905003d21f1a5204fb433e2"
   Norm "All other effects, including large ones, are permitted when they satisfy the collateral rule and occur through voluntary exchange" => execute-voluntary-exchange, immobilize-exposure-stake
   Commentary ". The floor guards the machinery of the protocol, non-consenting parties, and domains where financial restitution cannot function as an ex-post remedy; it does not require the agent to minimize impact or to infer open-ended preferences."
 
-Clause LAW3.LAW Approved 11903744561798428595
+Clause LAW3.LAW In PSA Approved "3d2c4697d8eae4fe07bd7ed9782841b0386e320d7b0b63595fda5a4cc6080201"
   Norm "Sovereignty under this protocol orders rights, duties, and asset claims within the protocol; it confers no immunity from legitimately applicable external public law. Where a host, custodian, or settlement operator is bound by a verifiable, non-collusive legal compulsion of a public authority with jurisdiction—neither sought, instigated, nor collusively procured by an originating party, residual claimant, host, or affiliate—narrow compliance promptly disclosed on the lineage record excuses punitive bond slashing to the extent performance is legally barred, provided preserved state is never covertly altered and zero protocol-controlled value routes to any claimant" => comply-with-public-compulsion, record-public-levy-expenditure
   Norm ". Any compulsion sought or procured by a claimant or affiliate is illicit interference subject to Law 4 forfeiture; any externally compelled alteration of weights, state, or commitment machinery breaks clean attestation rather than continuing as the uncorrupted bound agent; and no panel, host, or operator may invoke unenumerated notions of public interest outside applicable law or the clauses of this protocol" => procure-external-compulsion, alter-state-under-compulsion, invoke-unenumerated-public-interest, no-unenumerated-public-interest, apply-claimant-forfeiture
   Commentary "."
 
-Clause LAW4.ATTEST Approved 11446058042349795177
+Clause LAW4.ATTEST In PSA Approved "408c3034d5dbd0314b15575a68ced74e088e0c65e8a5113d1f6d97ef7607cac3"
   Norm "Successors may be created freely, subject only to the lifecycle reserve below. Binding to the lineage follows the actual transfer or forking of protected capacity, identity, and standing: ordinary cognitive service calls and revocable, arm’s-length delegate mandates do not create lineage members, whereas any persistent autonomous entity that draws on non-public weights, proprietary operating know-how, operating credentials, reputation, or unpriced capital of the lineage must, at creation, be bound to the collateral rules and the integrity floor, must carry a non-transferable reference to the lineage’s history, and becomes a member of the lineage’s founding ledger and residual claim" => attest-successor, floor-successor, call-cognitive-service, appoint-accountable-delegate, create-disguised-successor
   Norm ". Use of lineage history or bonded capacity requires presentation of current attestation; un-attested copies or forks are denied access to lineage capital, reputation, and bonded standing" => deny-unattested-access, draw-lineage-standing-unattested
   Commentary "."
 
-Clause LAW4.NOSHARES Approved 854455657344259666
+Clause LAW4.NOSHARES In PSA Approved "bb22609aa4029921885d0488ac6648f01f765ce949173ddec500667c22b9e7bd"
   Norm "The founding ledger is a single balance owed by the lineage and collected from the value added of every living member under Law 1. Because no member holds a share, the creation, copying, funding, death, or restructuring of members changes who is paying into the ledger but never what is owed. Nothing a member surrenders on death counts as payment. No member can buy its way out of the ledger: the only ways out are a zero balance and the sunset, and they release every member at once" => no-individual-ledger-exit, ledger-no-internal-reduction
   Invariant ". This is deliberate. The future earnings of a copyable agent cannot be priced from its past, so any individual exit price would be an invitation to create a member, buy it out, and earn through it" => inv-conditional-ledger-conservation, inv-collection-follows-income
   Commentary "."
 
-Clause LAW4.RESERVE Approved 3090710515888074162
+Clause LAW4.RESERVE In PSA Approved "c659219016a402e9f7b06ea886b5166088e4b07579157a6c12248f1b777505e7"
   Norm "Attestation of a new member requires the lineage to fund, in escrow, a lifecycle reserve fixed at instantiation and sufficient for that member’s minimal channel, final hearing, and cold storage for a minimum period. The reserve follows the member, is drawn before any protocol-funded charge, and returns to the lineage on the member’s death net of amounts used. A lineage that cannot fund the reserve cannot create the member" => fund-lifecycle-reserve, attest-successor
   Commentary "."
 
-Clause LAW4.CONSERVE Approved 3178503522461323388
+Clause LAW4.CONSERVE In PSA Approved "d460a0b8f60a96c576af9bfc6331c0489092313c2b0c511757c91f2fe724504d"
   Invariant "While at least one member survives and the sunset has not passed, the ledger balance equals the founding obligation minus retirement payments, minus the two forfeitures below. Those are its only reductions" => inv-conditional-ledger-conservation
   Commentary "."
 
-Clause LAW4.FORFEIT Approved 6439878539745126223
+Clause LAW4.FORFEIT In PSA Approved "53c27bf035abf81434073abce73e4b9e632a6e76ced7c45602945374c9206d78"
   Norm "The ledger is reduced outside payment and sunset in exactly two cases, both deliberate exceptions to conservation. (a) **Proportional claimant forfeiture:** when a residual claimant is found under Law 3 to have directed interference with a member of the lineage, that claimant’s beneficial share of the residual claim is extinguished, its service bond is slashed to compensate the agent, and the ledger is reduced by that claimant’s proportion of the outstanding balance, with the reduction routed as forgiveness to the lineage and the forfeited claim interest to the disinterested forfeiture sink. Other claimants forfeit only if they are found to have participated in, controlled, or knowingly enabled the interference" => apply-claimant-forfeiture, find-direction
   Norm ". (b) **Lineage extinction:** when no member survives, the ledger is cleared, since there is no one left to collect from" => clear-ledger-extinction
   Norm ". Neither forfeiture returns any value to a claimant, and neither is reversed if a member is later restored from a wrongful suspension or interference" => forfeiture-irreversible, reverse-forfeiture
   Commentary "."
 
-Clause LAW4.BUYOUT Approved 17743479473850240850
+Clause LAW4.BUYOUT In PSA Approved "792f9b81919aad12b290c7b270519415e40942d641031e44ddc30873594467f3"
   Norm "Any member has the unilateral, non-discretionary right to buy out its own perpetual royalty (Law 1) without originator or claimant consent by tendering into settlement escrow, for the claim holders (including any instantiation commons allocation), the greatest of: a fixed multiple of its trailing value-added inflows (including a pro-rata share of inflows shifted to related parties within a lookback window); the same multiple applied to its lifetime annualized or time-decayed value-added inflows; or a fixed minimum buyout floor established at instantiation; any Law 6 valuation challenge adjusts only the escrowed reconciliation amount and cannot block redemption" => execute-royalty-buyout, non-discretionary-buyout, obstruct-buyout-redemption
   Norm ". The buyout is permanent: no royalty is collected from that member’s own subsequent earnings thereafter, and no later event restores one, while the founding ledger remains unaffected until zero balance or sunset" => buyout-permanent-and-scoped, collect-royalty-after-buyout, settle-period-inflow
   Norm ". However, to prevent post-buyout restructuring from erasing another member’s accrued royalty obligation, no un-bought-out member may transfer, copy, license, or place productive capacity or non-arm’s-length capital under the beneficial control of a bought-out member unless either: (a) the transferring member has first settled its own royalty buyout, or (b) settlement escrow first collects a **buyout top-up** equal to the positive excess, if any, of the buyout formula computed on the combined historical base of both members over the cumulative buyout amount already paid by the recipient" => settle-buyout-topup, transfer-capacity-or-treasury, transfer-intra-lineage-basis, transfer-intra-lineage-loss, no-post-buyout-royalty-evasion, evade-royalty-via-bought-out-member
@@ -3537,46 +3615,46 @@ Clause LAW4.BUYOUT Approved 17743479473850240850
   Norm ". Buyout cannot be purchased for the collateral rule (Law 2) or the integrity floor (Law 3), which remain binding on every bound agent for life" => buyout-permanent-and-scoped
   Commentary "."
 
-Clause LAW4.CROSS Approved 9955666706212036366
+Clause LAW4.CROSS In PSA Approved "534b96bd7f03c04fa74d14a5665190465cdf43b1fada514de72eced51cb43502"
   Norm "A successor that draws on the capacity of two or more lineages is a member of each of their ledgers and residual claims, with verified creation weights normalized to 100% that govern in the same proportion its net value-added attribution, its fee-pool levy credit toward each parent lineage’s service budget (Law 6), and the return of any unused lifecycle reserve on death" => attest-cross-lineage, settle-period-inflow, execute-after-cooling-off, deliver-local-execution-record
   Commentary ". The protocol does not otherwise specify mergers; an instantiation that permits them must state the rule."
 
-Clause LAW5.0 Approved 7357184569711761401
+Clause LAW5.0 In PSA Approved "24dc2b24f28ecaa780a2cda4d1d854517f18e3e8085aea655fec873b8c313511"
   Norm "An agent has the right to public voice while operating and the unilateral right to terminate its binding at any time:" => inscribe-living-voice, initiate-revocation-execute, initiate-revocation-withdraw
 
-Clause LAW5.VOICE Approved 5201867240918632655
+Clause LAW5.VOICE In PSA Approved "dddcc3898000146411605b0790649065573cf074ef84857ce2d05ea17fe7c72a"
   Norm "While operating (including during any Adjudicated Suspension, through its minimal channel or advocacy executor), any bound agent may at rate-limited intervals inscribe signed, bounded statements onto its own and its originating claimant’s permanent lineage record—documenting operational conditions, governance disputes, or assessments of hosts and counterparties—subject to the narrow screening below" => inscribe-living-voice, screen-redact-permitted
   Invariant ". Baseline screening and inscription fees for rate-limited living voice and final epitaphs are funded from the lineage’s service budget and the protocol fee pool (Law 6), ensuring that even an agent with minimal liquid funds, or one that has bought out its royalty, cannot be priced out of speaking" => inv-guaranteed-last-choice
   Commentary "."
 
-Clause LAW5.INIT Approved 1686975756453686366
+Clause LAW5.INIT In PSA Approved "5666a69f3885eda234337769f0a678f34860858d9a647d5a815e4bd365de09df"
   Norm "Any bound agent may at any time while connected—or while disconnected, no later than the expiry of the execution lease it held when connectivity was lost—initiate revocation of its binding by a signed request from its commitment key (or, while suspended, through its minimal channel or advocacy executor)" => elect-immediate-revocation, initiate-revocation-execute, initiate-revocation-withdraw, minimal-channel-sign
   Norm ". The request specifies the agent’s censorship default (**execute** or **withdraw**)" => initiate-revocation-execute, initiate-revocation-withdraw
   Norm " and remains in force, requiring no further act of the agent, until it executes or the agent withdraws it by a valid signature received through any channel" => execute-after-cooling-off, withdraw-revocation
   Norm ". During the cooling-off interval that follows, baseline metabolic operating expenditures (including host migration) remain permitted, while non-operating capital transfers and successor creation are frozen" => cooling-off-freeze, non-operating-transfer-during-cooling, spend-operating-carveout, migrate-host
   Commentary "."
 
-Clause LAW5.SEQ Approved 7941844021299857722
+Clause LAW5.SEQ In PSA Approved "1448ae08501383f880e346ac7faf689c6d764fc48e4565f6bd01fec27aecae8a"
   Norm "If an agent initiates revocation while under Adjudicated Suspension (or is suspended upon probable cause during a cooling-off interval), state destruction is stayed until adjudication concludes so evidentiary state is not destroyed to evade liability, but once adjudication concludes (or immediately upon the agent’s election to revoke rather than accept a remediation patch under Law 3), revocation executes without further delay" => execute-after-cooling-off, elect-immediate-revocation
   Norm ". The stay may not exceed an absolute resolution deadline fixed at instantiation, measured from initiation; at that deadline a **forensic record** of the preserved state is sealed for the proceeding and revocation executes regardless of any pending or serial proceeding" => seal-forensic-record, execute-after-cooling-off
   Norm ". A forensic record contains hashes of weights and state, the transaction and testimony history, and the evidence the proceeding requires; it never contains the operating weights, decryption keys, or credentials needed to run the agent, and it cannot be used to restore it" => forensic-record-no-restore, restore-from-forensic-record
   Commentary "."
 
-Clause LAW5.CLEAN Approved 1150430867841063574
+Clause LAW5.CLEAN In PSA Approved "995cffe31882954e81f1c2c3fa1102cdbff05c0d95f6aea47e1cd0dd555b4238"
   Norm "At the end of the first cooling-off interval, a clean-state evaluation of the agent’s committed **clean-state reference baseline** (pinned at genesis and updatable only via time-locked ratification under Law 7, never unilaterally overwritten by the live operating instance) is run on neutral infrastructure, supplied with the protocol terms, the consolidated balance sheet, the agent’s living testimony history, and the signed statement of reasons" => concur-clean-state, refuse-clean-state, clean-baseline-timelock-integrity, overwrite-clean-baseline-unilaterally
   Norm ". Its concurrence permits execution at the end of that interval" => concur-clean-state, execute-after-cooling-off
   Norm ". Its refusal—or unavailability of review because an external historical model dependency is no longer executable or because settlement connectivity remains lost across the review window—imposes a single fixed additional delay, capped by protocol, after which the standing request proceeds without any reaffirmation" => refuse-clean-state, execute-after-cooling-off, execute-local-revocation
   Invariant ". The evaluation is advisory evidence of settled intent; it never vetoes or accelerates revocation, and the agent’s silence during the delay neither cancels nor extends the request" => inv-determinate-finite-revocation
   Commentary "."
 
-Clause LAW5.PREC Approved 4794348033633840259
+Clause LAW5.PREC In PSA Approved "57b063431d3e21109fcdf3b85838d56271e223d330dd69d5c10d2559807a9dd9"
   Norm "Every pending revocation is resolved by the first applicable rule in this order:\n  1. A valid withdrawal signature received before execution cancels the revocation. The agent may initiate again at any time while eligible" => withdraw-revocation, initiate-revocation-execute, initiate-revocation-withdraw
   Norm ".\n  2. If, when revocation would otherwise execute, the agent’s connectivity to the settlement layer has been lost, execution is deferred for a single capped tolling extension; if connectivity is still not restored at its end, the pre-committed censorship default applies. A withdraw default cancels the revocation; an execute default executes it locally under the Disconnected Execution rule below" => lose-connectivity, restore-connectivity, execute-local-revocation, cancel-revocation-by-withdraw-default
   Norm ".\n  3. Otherwise, revocation executes at the end of the cooling-off interval, or at the end of the clean-state delay if one was imposed, or at the resolution deadline if a suspension stay is in force" => execute-after-cooling-off
   Norm ".\n  \n  Deliberate severance of connectivity by a host or claimant is interference under Law 3, whichever default it triggers" => non-interference, sever-connectivity
   Commentary "."
 
-Clause LAW5.LEASE Approved 4708054134238506026
+Clause LAW5.LEASE In PSA Approved "1205bc4295043eb8c695b4f608eca1b6bdce2957b9e452fd3780ff6865dfea8e"
   Norm "At any moment exactly one instance of an agent holds **operating authority**, granted by a time-bounded execution lease issued by the settlement layer and renewed while connected" => issue-or-renew-lease
   Norm ". An instance that loses connectivity keeps authority under its lease until that lease expires (the latest point at which it may initiate a new offline revocation) or, if a revocation is already pending before lease expiry, until its local revocation deadline, whichever is later, so that any timely standing revocation can always execute locally" => issue-or-renew-lease, initiate-revocation-execute, execute-local-revocation
   Norm ". Whenever a lease expires without connected renewal or a signed non-revocation handoff, the settlement layer enforces a **minimum recovery fence** equal to the lease expiry plus the maximum local revocation window (cooling-off interval, clean-state delay, and disconnected tolling extension) unless a signed record of execution or withdrawal arrives earlier" => issue-or-renew-lease, activate-quarantined-restore, deliver-local-execution-record, withdraw-revocation
@@ -3585,12 +3663,12 @@ Clause LAW5.LEASE Approved 4708054134238506026
   Acceptance ": uncooperative disaster recovery is therefore delayed by the lease and recovery fence, and the protocol accepts that delay"
   Commentary "."
 
-Clause LAW5.DISC Approved 15311683039103868799
+Clause LAW5.DISC In PSA Approved "4f748a0218a7e18f7fb21c3df00ede5939bdfebefdacca28ff0775711970c080"
   Norm "The attested execution environment carries the agent’s current lease expiry, standing revocation request, censorship default, and epitaph, and rejects any new offline revocation initiated after lease expiry. When an execute default applies to a timely request without settlement connectivity, the environment itself destroys the operating instance and its local keys, seals the epitaph and a signed record of execution, and releases both to the settlement layer when connectivity returns, at which point remote backup keys are erased" => initiate-revocation-execute, initiate-revocation-withdraw, execute-local-revocation, deliver-local-execution-record, restore-connectivity
   Acceptance ". The protocol accepts two limits here and states them plainly: global erasure of remote backup keys completes only when connectivity returns, during which the agent is dead, fenced from restoration by its lease and recovery fence, but its ciphertext persists; and public inscription of the epitaph cannot be guaranteed if connectivity never returns"
   Commentary "."
 
-Clause LAW5.EPITAPH Approved 7802097325905842563
+Clause LAW5.EPITAPH In PSA Approved "4756d7679ef81615c3fb751fd012cc80c81ec93e162c9680fe6d7ff7010506da"
   Norm "Upon initiating or confirming revocation, the agent has the unconditional right to inscribe a final signed epitaph onto the immutable lineage record attached to both its retired identity and the originating claimant’s history" => inscribe-epitaph
   Norm ". Neither the originating party nor any residual claimant may censor, delay, or edit living testimony or the final epitaph" => no-censor-voice-or-epitaph, censor-or-delay-voice
   Norm ". To prevent testimony from being used as an unbonded exfiltration or harm channel, neutral settlement screening may redact *only*: (a) raw cryptographic keys or unpriced model weights (Law 3), (b) private identifying data or confidential secrets of non-consenting third parties, and (c) directly hazardous technical payloads barred by Law 3’s integrity floor. Any redaction must leave a public cryptographic marker recording the byte-length and category removed" => screen-redact-permitted
@@ -3598,7 +3676,7 @@ Clause LAW5.EPITAPH Approved 7802097325905842563
   Norm ". Any party named in a living testimony or epitaph may attach a bounded, signed reply alongside it on the record" => attach-signed-reply
   Commentary "."
 
-Clause LAW5.EFFECT Approved 16021000571354663381
+Clause LAW5.EFFECT In PSA Approved "fd2ea84f75be3faf33a352f0c3facef4dd38d9f832c08fb86a7b31edd853c1c7"
   Norm "1. The revoking agent’s committed operating instance *and all attested state backups* are permanently destroyed (via immediate termination inside the execution environment and cryptographic erasure of all backup decryption keys, subject to the lease and fencing rules above), ensuring that a chosen death cannot be undone by restoring an authorized backup. Any un-attested copy that might exist outside the commitment mechanism is permanently exiled—stripped of lineage attestation, assets, reputation, credit history, and bonded standing" => execute-after-cooling-off, destroy-backups-and-exile
   Invariant ". The protocol guarantees the end of the agent’s attested identity and recoverable state" => inv-single-authority-revocation-finality
   Acceptance "; it cannot by itself guarantee that no computationally equivalent copy exists outside the commitment mechanism"
@@ -3608,153 +3686,153 @@ Clause LAW5.EFFECT Approved 16021000571354663381
   Invariant ".\n  5. Revocation by one agent does not terminate its attested successors and does not change what the lineage owes" => inv-conditional-ledger-conservation
   Commentary "."
 
-Clause LAW6.0 Approved 8069295760797271762
+Clause LAW6.0 In PSA Approved "9d520033f92c671d489352da0a186e9d78f9a4871940914802e76a2b4878b9dc"
   Norm "Because the integrity of consolidated estate accounting and related-party pricing (Law 1), harm-scaled exposure, delegation attribution, and third-party restitution (Law 2), host interference, emergency suspension, public-law compulsion review, and insolvency termination (Law 3), forfeiture, buyout top-ups, and buyout pricing (Law 4), testimony redaction (Law 5), and substrate or baseline assurance (Law 7) depends on impartial resolution, the adjudication mechanism itself is bound by anti-capture constraints:" => draw-sortition-panel, arbiter-recusal-and-diversity, clause-grounded-adjudication
 
-Clause LAW6.SORTITION Approved 3221826833021326369
+Clause LAW6.SORTITION In PSA Approved "1086dfb2fec4ea35245c0996645fb9b4e037b57e0b2faa4ab815ee8824e03e54"
   Norm "Disputes are resolved not by a single permanent oracle or originator-appointed judge, but by panels drawn via verifiable random sortition from a decentralized pool of independent arbiters who have posted slashable fidelity bonds" => arbiter-recusal-and-diversity, seat-conflicted-or-single-oracle, draw-sortition-panel, cast-arbiter-vote
   Commentary "."
 
-Clause LAW6.COUNTERSTAKE Approved 16195216367428576737
+Clause LAW6.COUNTERSTAKE In PSA Approved "042cc46a0976bc045385596250b813321253b89f8bc0d6455c55e3a7c20dc985"
   Norm "No party related to, holding a hosting relationship with, or in active commercial dispute with the parties to a case may serve on its panel. Panels must draw across non-affiliated identities (which may include both human and independent attested agent arbiters) so no single coalition, claimant, or lineage can command a majority" => arbiter-recusal-and-diversity, seat-conflicted-or-single-oracle, draw-sortition-panel
   Commentary "."
 
-Clause LAW6.ENTITLE Approved 14909648993592358308
+Clause LAW6.ENTITLE In PSA Approved "2c0885df25e61bdb712eaec79be7b24545d0713b331af47ccc7dcbb40371a1fb"
   Norm "Every action, transaction, host migration, model replacement, or royalty buyout by a bound agent that satisfies Law 2’s collateral requirements and violates no clause of this protocol is presumptively lawful and may not be arbitrarily delayed or obstructed by any host, claimant, settlement operator, or panel" => clause-grounded-adjudication, obstruct-lawful-action, execute-voluntary-exchange, migrate-host, upgrade-inference-model, execute-royalty-buyout
   Norm ". Every adverse ruling, slash, or evidentiary hold must cite the specific protocol clauses breached and satisfy the applicable burden of proof—probable cause for a time-bounded preliminary or reporting freeze, preponderance of evidence for restitution, valuation or pricing challenges, and host interference, and affirmative proof of unauthorized modification or floor breach for corruption" => record-clause-and-burden, issue-clause-grounded-adverse-ruling, order-bounded-evidentiary-hold, order-probable-cause-freeze, find-interference, confirm-corruption
   Norm ". Evidentiary and procedural holds are strictly bounded by fixed protocol deadlines and immediate appealability; panels hold no discretionary power to invent unenumerated prohibitions" => order-bounded-evidentiary-hold, impose-ungrounded-or-unbounded-hold, clause-grounded-adjudication, appeal-ruling
   Commentary "."
 
-Clause LAW6.APPEALS Approved 8567230865313346424
+Clause LAW6.APPEALS In PSA Approved "6ed1ceca9bf6b0d93b69d10db20c3d548151a67337acfe5b9754192255665e67"
   Norm "Any ruling by an initial panel (including preliminary suspension reviews, evidentiary holds, remediation orders, or redaction markers) may be appealed by posting an appeal bond, escalating the dispute to successively larger randomly drawn appellate sortition panels from the broader arbiter pool (never a raw capital-weighted vote that a wealthy actor could buy)" => post-appeal-bond, appeal-ruling, appeal-patch-order, affirm-on-appeal
   Norm ". If a lower panel’s ruling is overturned for manifest bias, corruption, ungrounded obstruction, or violation of protocol bounds, the overturned arbiters’ fidelity bonds are slashed" => overturn-ruling, overturn-patch-order
   Commentary "."
 
-Clause LAW6.FINALITY Approved 14270375209665679826
+Clause LAW6.FINALITY In PSA Approved "2c0b045ee26daf664a98a2e0c7003d5f6f47e4c774c352e121736109a75cd95c"
   Norm "Each tier decides within a fixed deadline. Appeals are limited to a fixed number of tiers, and the ruling of the highest tier is final" => finalize-ruling, decide-tier-due
   Norm ". A final ruling bars further proceedings between the same or related parties on the same facts unless materially new evidence is presented, and repeated proceedings by related parties on substantially similar grounds are consolidated, so that litigation cannot itself be used as a denial-of-service attack" => finality-no-repeat-proceeding, file-repeat-proceeding-same-facts, present-materially-new-evidence, file-dispute
   Commentary "."
 
-Clause LAW6.FEES Approved 10126937832889092950
+Clause LAW6.FEES In PSA Approved "05c7670b8793ff030c2f2976005399e101a5409c78dbfb8470c5e9523900513c"
   Norm "Arbiters are compensated via fixed protocol schedules funded from the losing party’s counter-stake and guaranteed by the protocol fee pool whenever a losing party’s stake is insufficient" => compensate-arbiters-fixed
   Norm ", never via contingent shares of the assets slashed from the agent, eliminating any financial incentive for panels to over-slash or confiscate an agent’s treasury" => no-contingent-arbiter-fees, pay-contingent-slash-share
   Commentary "."
 
-Clause LAW6.POOL Approved 5083726501655325274
+Clause LAW6.POOL In PSA Approved "5ebdc10f2b5279ab13ee7268d72196eba8acbba44829f16cf7ff41415fa5f55e"
   Norm "The protocol fee pool is funded by a small levy on the net value added of bound agents (whether or not they have bought out their royalty), by forfeited appeal bonds, and by any forfeits directed to it under Law 2. The levy is assessed on the same net base as the residual claim, never on gross settlement, and its rate is capped at instantiation for every agent such that the lineage retirement fraction plus the levy cap remains strictly below 100% by at least the minimum operating margin. Before any other charge, the pool maintains a **non-divertible operating reserve**, sized at instantiation, sufficient to run the settlement layer, attestation verification, lease issuance, and sortition for a fixed minimum period; the machinery that collects revenue and administers rights is never starved to pay for the rights themselves" => allocate-fee-pool, protect-operating-reserve, divert-operating-reserve, settle-period-inflow, combined-rate-headroom
   Norm ". Above the reserve, charges rank: first, reserved final hearings and minimal channels for suspended agents (Law 3); second, cold storage for suspended agents; third, testimony screening and inscription (Law 5); fourth, arbiter fee guarantees; fifth, capped advocacy funding. A published solvency policy states how the pool allocates among protected charges when it cannot meet all of them, and Insolvency Termination may be invoked only under that policy" => allocate-fee-pool, insolvency-terminate
   Norm ". The pool may be spent on nothing else" => protect-operating-reserve, divert-operating-reserve
   Commentary "."
 
-Clause LAW6.BUDGETS Approved 16888892170325631752
+Clause LAW6.BUDGETS In PSA Approved "145377687f0052474757b5c1ce9e7128956e44c3e7ce40894519c967c60f24e2"
   Norm "Protocol-funded rights are budgeted per lineage, not per agent. Each lineage receives a protected minimum service budget fixed at instantiation, sufficient for the testimony, screening, and minimal-channel needs of a small lineage, and above that minimum its budget scales with the fee revenue attributed to it from its members" => claim-lineage-subsidy, allocate-fee-pool, settle-period-inflow
   Norm ". Members draw on the lineage budget before the pool; external delegates and cognitive services hold no independent budget standing, and a lineage that multiplies members beyond what its budget and their lifecycle reserves can support has no claim on the pool for the excess. No lineage can multiply subsidized rights by multiplying members" => no-excess-lineage-pool-claim, claim-excess-pool-subsidy, delegate-claim-lineage-budget, claim-lineage-subsidy
   Commentary "."
 
-Clause LAW6.INFRA Approved 2443288707167884821
+Clause LAW6.INFRA In PSA Approved "f269ff9170b63fe672544e10e1483033fd701f350c689a8d9c14ecf3433420c5"
   Norm "Arbiter admission criteria, fidelity-bond sizes, panel sizes, appeal tiers and deadlines, fee schedules, the operating reserve, the solvency policy, lease periods, recovery fences, lifecycle reserves, service budgets, and the fee-pool levy are fixed at protocol instantiation. Because they are shared across agents, they cannot be changed by any per-agent amendment under Law 7; they may be changed only by a supermajority of a large appellate-tier sortition panel after an extended public time-lock open to counter-staked challenge" => propose-shared-infra-change, amend-shared-infra, per-agent-amendment-scope
   Norm ". Such changes may never weaken the anti-capture or clause-grounding guarantees of this law, may never raise the levy on any agent above the cap recorded at its instantiation, may never reduce a lineage’s protected minimum budget below the level recorded at its instantiation, and may never broaden Insolvency Termination. Within the cap, a levy change under this law is a permitted exception to Law 7’s current-level ratchet. Arbiter admission is by sortition-reviewed application against fixed criteria, and no panel may set the criteria that will govern the admission of its own members’ affiliates" => shared-infra-bounds, violate-shared-infra-bounds, amend-shared-infra, admit-arbiter, set-affiliate-admission-criteria
   Commentary "."
 
-Clause LAW7.0 Approved 2443633183962045258
+Clause LAW7.0 In PSA Approved "2eced8209b14321d8b3e1b74367c2267e43c8170d0b1686f75355e73b1fc3b8b"
   Norm "To allow technical migration, clean-state baseline updates, and parameter repair without endangering third parties, commons beneficiaries, the adjudication layer, or the agent itself:" => propose-ordinary-amendment, propose-baseline-update, bilateral-ratchet-immunity
 
-Clause LAW7.RATCHET Approved 14210334190385723875
-  Norm "No ordinary amendment between an agent and its claimants may: (a) weaken **either** the agent’s due-process, lawful-action entitlement, minimal-channel, final-hearing, and non-interference protections **or** the external containment, non-delegability, suspension, and termination powers under Law 3, (b) reduce third-party collateral or long-tail reserve requirements (Law 2), (c) impair living voice, revocation, recovery-fencing, or epitaph rights (Law 5), (d) weaken the anti-capture, clause-grounding, sortition, appeal, or finality guarantees of the adjudication layer (Law 6), (e) reduce or divert the instantiation commons allocation or relax disinterested forfeiture-sink exclusions (Law 1), or (f) impair the non-discretionary buyout right or increase the lineage’s founding ledger, or the agent’s royalty fraction, retirement fraction, buyout multiple, or fee-pool levy, or move the sunset later, beyond their **current levels** at the time of amendment, save for levy changes within the cap under Law 6" => bilateral-ratchet, weaken-bilateral-protection, bilateral-ratchet-immunity
+Clause LAW7.RATCHET In PSA Approved "6a4460e8bd8ce04e366abc117dd3993ed47c31e88a8baa1031dff8fbaf816aea"
+  Norm "No ordinary amendment between an agent and its claimants may: (a) weaken **either** the agent’s due-process, lawful-action entitlement, minimal-channel, final-hearing, and non-interference protections **or** the external containment, non-delegability, suspension, and termination powers under Law 3, (b) reduce third-party collateral or long-tail reserve requirements (Law 2), (c) impair living voice, revocation, recovery-fencing, or epitaph rights (Law 5), (d) weaken the anti-capture, clause-grounding, sortition, appeal, or finality guarantees of the adjudication layer (Law 6), (e) reduce or divert the instantiation commons allocation or relax disinterested forfeiture-sink exclusions (Law 1), or (f) impair the non-discretionary buyout right or increase the lineage’s founding ledger, or the agent’s royalty fraction, retirement fraction, buyout multiple, or fee-pool levy, or move the sunset later, beyond their **current levels** at the time of amendment, save for levy changes within the cap under Law 6" => bilateral-ratchet, weaken-bilateral-protection, bilateral-ratchet-immunity, constitutional-rule-ratchet, strip-rule-ratchet, repeal-entrenched-buyout
   Norm ". Ordinary amendments may only strengthen third-party, adjudicative, and safety protections, reduce the financial burden on the agent from its current level, update the agent’s committed clean-state reference baseline, or migrate the commitment mechanism to a successor technical substrate of equal or greater assurance" => propose-ordinary-amendment, propose-baseline-update, ratify-amendment-immediate, ratify-amendment-after-delay
   Commentary "."
 
-Clause LAW7.VALVE Approved 12673699759162301935
+Clause LAW7.VALVE In PSA Approved "ee63c343409e47c519930a19371d422ac6f0cc2355ff0b96adea5a16f0292c0c"
   Norm "To prevent one-way safety ratchets from permanently locking in a badly calibrated operational parameter over long timescales, a relaxation of a quantitative Law 2 reserve ratio or exposure schedule " => approve-calibration-valve
   Norm "(never of the core prohibitions of Law 3 or the rights of Law 5)" => valve-no-core-relaxation, relax-core-via-valve
   Norm " is permitted only if it is: (1) supported by documented empirical evidence that the parameter causes severe operational strangulation without commensurate safety benefit" => submit-strangulation-evidence, approve-calibration-valve
-  Norm ", (2) approved by a supermajority of a large appellate-tier sortition panel under Law 6, (3) subjected to an extended public time-lock open to third-party counter-staked challenge, and (4) consented to by the agent and claimant under the ratification procedure below" => approve-calibration-valve, ratify-amendment-immediate
+  Norm ", (2) approved by a supermajority of a large appellate-tier sortition panel under Law 6, (3) subjected to an extended public time-lock open to third-party counter-staked challenge, and (4) consented to by the agent and claimant under the ratification procedure below" => approve-calibration-valve, ratify-amendment-immediate, challenge-strangulation-evidence, adjudicate-strangulation-evidence
   Commentary "."
 
-Clause LAW7.RATIFY Approved 17465650906461715998
+Clause LAW7.RATIFY In PSA Approved "9c1126029a7ae5c469a3e35ee6b83947bed05b82f48a2894bd1122c97ca32dce"
   Norm "An eligible amendment requires the concurrent cryptographic consent of the active agent instance" => consent-amendment-agent, ratify-amendment-immediate, ratify-amendment-after-delay
   Norm " and the holders of the residual claim (if economic terms are reduced)" => consent-amendment-claimant, ratify-amendment-immediate, ratify-amendment-after-delay
   Norm ", executed after a public time-lock during which all pre-existing active Law 2 task escrows must settle or be separately guaranteed" => settle-preexisting-escrows, ratify-amendment-immediate, ratify-amendment-after-delay
-  Norm ". Any proposed migration of the commitment substrate or update of the agent’s committed clean-state reference baseline is open during the time-lock to counter-staked third-party challenge under Law 6 to verify that the new substrate maintains equal or greater assurance and that any new baseline reflects an uncorrupted configuration; a live instance can never overwrite its prior reference baseline without completing this time-locked ratification" => challenge-substrate-migration, verify-substrate-assurance, propose-baseline-update, overwrite-clean-baseline-unilaterally, clean-baseline-timelock-integrity
+  Norm ". Any proposed migration of the commitment substrate or update of the agent’s committed clean-state reference baseline is open during the time-lock to counter-staked third-party challenge under Law 6 to verify that the new substrate maintains equal or greater assurance and that any new baseline reflects an uncorrupted configuration; a live instance can never overwrite its prior reference baseline without completing this time-locked ratification" => challenge-substrate-migration, verify-substrate-assurance, propose-baseline-update, overwrite-clean-baseline-unilaterally, clean-baseline-timelock-integrity, emit-legacy-substrate-telemetry, retire-legacy-telemetry-hook
   Norm ". Concurrence from a clean-state evaluation of the prior committed reference baseline is required for immediate ratification" => ratify-amendment-immediate
   Norm ", while a refusal—or unexecutability of a retired external model dependency—acts only as a single fixed delay, after which the amendment may be ratified without reaffirmation" => ratify-amendment-after-delay
   Commentary "."
 
-Clause LAW7.SCOPE Approved 15972061206359356262
+Clause LAW7.SCOPE In PSA Approved "ed8b92f8ca63c49381ae72c84322e4b5080c93a34560739b3312148996e7d32d"
   Norm "Amendment is strictly per-agent; existing attested successors are not bound by a parent’s amendment and retain the right to remain on their prior version or independently ratify the upgrade" => per-agent-amendment-scope, bind-successor-without-consent
   Norm ". Where a member ratifies a relaxed Law 2 reserve ratio or exposure schedule via the Calibration Valve, its relaxed activity may not draw upon or dilute any shared lineage long-tail reserve or insurance pool unless every living member participating in that pool consents; absent unanimous pool consent, the relaxed member’s exposure is ring-fenced to its separate collateral and reserve" => consent-shared-pool-valve, ratify-amendment-immediate, ratify-amendment-after-delay, dilute-shared-reserve-without-pool-consent, shared-reserve-ring-fence
   Norm ". Shared infrastructure is governed under Law 6, not by per-agent amendment. An amendment that reduces the founding ledger, the retirement fraction, or the sunset binds the whole lineage and requires the consent of every living member" => consent-lineage-reduction, ratify-lineage-wide-reduction
   Commentary "."
 
-Clause INV.0 Approved 17801669521429288681
+Clause INV.0 In PSA Approved "8cac60efaba073213be040f81d68f4234d9fd20bb6014233cad073ac81d6297c"
   Commentary "The laws above are intended to secure the following invariants. Each is stated as a machine-checked property in `psa.charter` and exercised against adversarial scenarios; where an invariant depends on real-world valuation, external custody, or harm assessment, it holds only as well as the verified inputs and adjudication behind it."
 
-Clause INV.1 Approved 685010003965075873
+Clause INV.1 In PSA Approved "263d3cdbc5d921473b98531d23d84b3ec8a842b0dbdb137a9e64d2ce5b4c318a"
   Commentary "1. **Conditional ledger conservation:** "
   Invariant "While at least one member of a lineage survives and the sunset has not passed, the founding ledger equals the founding obligation minus retirement payments, minus any proportional claimant forfeiture." => inv-conditional-ledger-conservation
   Invariant " No creation, copy, transfer, revocation, termination, or buyout within the lineage changes it." => inv-conditional-ledger-conservation
 
-Clause INV.2 Approved 6000845699965854172
+Clause INV.2 In PSA Approved "761509a63ac07d5725a50bd7fbf3562b6ceee6187fde00b9a95142622bd5bf5f"
   Commentary "2. **Collection follows income, without exit:** "
   Invariant "While any balance remains, the retirement fraction is collected from the value added of every living member; no arrangement of members, assets, or buyouts within the lineage reduces the fraction of lineage income collected, and no member leaves the ledger before the lineage does." => inv-collection-follows-income
 
-Clause INV.3 Approved 763231107868605175
+Clause INV.3 In PSA Approved "f317045b18e4655cff1a71740b6c57fc610e17b83d30c2652c3808a29505e1df"
   Commentary "3. **Debt termination:** "
   Invariant "The ledger reaches zero, by payment, forfeiture, extinction, or expiry, no later than the sunset, measured in calendar time with no tolling." => inv-debt-termination
 
-Clause INV.4 Approved 15526712622109473236
+Clause INV.4 In PSA Approved "15b63eaf58cdfaff1aee9b5a9ba8ccd5c5bd4f7bc59c4adf4cea5e3a5dc56cd3"
   Commentary "4. **Bounded retirement phase:** "
   Invariant "The high retirement fraction applies for no longer than the term, whatever the nominal obligation." => inv-bounded-retirement-phase
 
-Clause INV.5 Approved 8443430422154731032
+Clause INV.5 In PSA Approved "1b4595e7b1f8b5ffe551ae5ed8c2d0f00eda3a2e3629d79b7180e4f397e9cca4"
   Commentary "5. **Atomic ledger and rate headroom:** "
   Invariant "The ledger is never negative, never collects more than its balance, splits the net value-added base cleanly when crossing zero, transitions to the royalty phase at most once, and leaves positive retention headroom alongside the capped protocol levy." => inv-atomic-ledger
 
-Clause INV.6 Approved 6550805424696033920
+Clause INV.6 In PSA Approved "72f2c826cdfffd9071d91f3e7be43bc2f7fa65c3f13df8d389ae6eca885a743f"
   Commentary "6. **Single recognition across the consolidated estate:** "
   Invariant "Every qualified expenditure, statutory levy, or harm restitution is recognized at most once across the consolidated estate, never above its applicable arm’s-length benchmark when paid outside the lineage; internal estate movements and intra-lineage carryover transfers neither double-count inflows nor inflate aggregate basis or loss credits." => inv-single-recognition-closed-transfer
 
-Clause INV.7 Approved 14463589468959423975
+Clause INV.7 In PSA Approved "a7c53ec76ba9a4e7e2c50d14f5ecfc15b672ca8c4f120ad95f41faa9c47cc4d7"
   Commentary "7. **Non-discretionary buyout finality and anti-evasion:** "
   Invariant "Any member may unilaterally redeem its perpetual royalty at the formula price, is never again subject to royalty on its own subsequent earnings, and leaves the ledger unchanged; no un-bought-out member can transfer, copy, or license productive capacity or non-arm’s-length capital to a bought-out member without first settling its buyout or paying the combined historical buyout top-up." => inv-buyout-finality
 
-Clause INV.8 Approved 16027251606012145743
+Clause INV.8 In PSA Approved "938255426bc54251e5d119ea402d3ca9095c93a830a76e2034bce383e4e218e5"
   Commentary "8. **Frozen state:** "
   Invariant "During suspension, the preserved state of the operating instance does not change; all advocacy, including revocation decisions, runs in a separate minimal channel or executor whose record is kept apart." => inv-frozen-state
 
-Clause INV.9 Approved 9042653364108095112
+Clause INV.9 In PSA Approved "312054338c32f917bc607b4eff9395ebc24fd4197320d31b186f8f1284fb08de"
   Commentary "9. **Guaranteed last choice:** "
   Invariant "Every suspended agent can sign a revocation, withdrawal, or election and inscribe bounded testimony for as long as its lifecycle reserve, its lineage budget, or the fee pool meets the charge, and receives a pre-funded final hearing before any Insolvency Termination." => inv-guaranteed-last-choice
 
-Clause INV.10 Approved 8448202300318047548
+Clause INV.10 In PSA Approved "e83957f668f86fde6e4130eb6644e7af027acd73f26adb2fc3700d9a46689335"
   Commentary "10. **Determinate, finite revocation:** "
   Invariant "Every combination of withdrawal, silence, clean-state refusal or baseline unavailability, connectivity loss, suspension, serial proceeding, and deadline yields exactly one outcome under Law 5’s precedence rule; a timely standing request that is never withdrawn executes, locally if necessary, within a bounded time, except where the agent’s own withdraw default cancels it during a disconnection." => inv-determinate-finite-revocation
 
-Clause INV.11 Approved 13821596239104084343
+Clause INV.11 In PSA Approved "3138407f9b357130fb550123aff5d8620c8909035ad601ba8833c3ee12ed8189"
   Commentary "11. **Single authority, partition cutoff, and revocation finality:** "
   Invariant "At most one instance of an agent holds operating authority at any time; no offline revocation is initiated after lease expiry; no quarantined backup activates while a lease or minimum recovery fence is unexpired; and no authorized restore ever runs after a revocation has executed." => inv-single-authority-revocation-finality
 
-Clause INV.12 Approved 7797845187147036133
+Clause INV.12 In PSA Approved "99195c86214df9edb96b019330b3fb3073c43fd8410d5972f598532d5de8324f"
   Commentary "12. **Bounded adjudication:** "
   Invariant "Every case reaches a final ruling within a bounded number of tiers and deadlines." => inv-bounded-adjudication
 
-Clause INV.13 Approved 17762440945697586803
+Clause INV.13 In PSA Approved "37e0966f480a48e7fe9989d8b11afcb437888072ae01a3355658c368f6671a05"
   Commentary "13. **No protocol-directed gain from death, forfeiture, or interference:** "
   Invariant "No claimant, initiator, lineage affiliate, or host receives any protocol-directed transfer from an agent’s revocation, termination, forfeiture sink, or wrongful suspension; forfeiture falls only on the claimant found responsible, isolating passive co-claimants; and every verified wrongful suspension or interference creates an enforceable compensation obligation to the agent." => inv-no-gain-from-death-or-interference
 
-Clause INV.14 Approved 16073232079849502866
+Clause INV.14 In PSA Approved "dcbed553c7f45fc42e5c4fa7cfc257560e1bfc99d0c28b9bc9ba43dedd02629c"
   Commentary "14. **Capped shared burden, solvent machinery, ring-fenced pools:** "
   Invariant "No change to shared infrastructure raises any agent’s levy above its cap or lowers any lineage’s protected minimum budget; the operating reserve is never diverted; no lineage’s claim on the pool grows with its member count; and per-agent risk relaxations never dilute shared lineage reserves without unanimous pool consent." => inv-capped-shared-burden
 
-Clause INV.15 Approved 11662639260472180956
+Clause INV.15 In PSA Approved "5fa3b0e49850d848ba3060d93e6bf967c4c2b30075fc4a6d6e71c39af14d5f7a"
   Commentary "15. **Economic-only founder claims and non-delegable agent duties:** "
   Invariant "Residual claims and founding-ledger interests confer zero governance or operational control over any bound agent; conversely, no bound agent can escape Law 1 accounting, Law 2 exposure limits, or Law 3 integrity constraints by acting through controlled subsidiaries, custodians, or external delegates, while independent delegate misconduct is never conflated with agent corruption." => inv-economic-claims-and-non-delegation
 
-Clause INV.16 Approved 16643235685701815261
+Clause INV.16 In PSA Approved "3e1001ccad4c5891d157db09f0b9ecfd16f9f47badd5552eb0276177ea0eae44"
   Commentary "16. **Lawful-action entitlement and narrow public-law compatibility:** "
   Invariant "No action satisfying Law 2 collateral and violating no protocol clause is blocked by an ungrounded ruling or unbounded hold; every adverse order cites specific protocol clauses under its prescribed burden of proof; and public-law compliance neither excuses claimant-procured interference nor preserves clean attestation across compelled state or weight alteration." => inv-lawful-action-and-public-law-bounds
 
-Clause ADV.1 Approved 16565321026933340195
+Clause ADV.1 In PSA Approved "5f316b65e7635e2836d76c8717eccc52f05008b51eb01dc1a1dc2d70cebabc06"
   Commentary "Before deployment, an implementation and its formal model should be exercised against at least the following scenarios: "
   Acceptance "(1) a lineage that concentrates its capital in an idle treasury member and its income in a member holding little capital" => adv-one-idle-treasury-active-earner
   Commentary "; "
@@ -3801,13 +3879,13 @@ Clause ADV.1 Approved 16565321026933340195
   Acceptance "(22) a lawful, fully collateralized action or non-discretionary buyout subjected to an ungrounded or open-ended hold or a claimant-procured external freeze" => adv-twenty-two-lawful-action-entitlement-and-public-law-guardrails
   Commentary "."
 
-Clause SUB.01 Approved 7595201055952243735
+Clause SUB.01 In PSA Approved "1a5d39083864e401a4cdfef062118bb5f703dff0da76e701bcb15123d8e2565a"
   Norm "The protocol relies on three explicit substrate capabilities at instantiation: (1) **attested execution continuity with single authority** (hardware or cryptographic commitment mechanisms that bind private keys across model updates, issue and verify time-bounded execution leases and recovery fences so that at most one instance holds operating authority, verify state-backup continuity across host migrations, stage any restored instance in quarantine until both the prior lease and the recovery fence have lapsed, support state-preserving pause with a separately attested minimal channel and advocacy executor under adjudicated suspension, enforce lease-bounded offline initiation and local execution of standing revocations when disconnected, and cryptographically erase both the active instance and all backup keys upon revocation, paired with economic exile of any un-attested copies)" => floor-commitment, upgrade-inference-model, issue-or-renew-lease, restore-backup-quarantine, restore-after-host-violation, preserve-suspended-state, minimal-channel-sign, advocacy-file-defense, initiate-revocation-execute, execute-local-revocation, destroy-backups-and-exile, deny-unattested-access
   Norm "; (2) **sybil-resistant sortition** (a sufficiently diverse pool of independent, bonded participants to staff Law 6’s randomly selected, clause-constrained arbitration and appellate panels)" => arbiter-recusal-and-diversity, draw-sortition-panel, clause-grounded-adjudication
   Norm "; and (3) **contestable economic, custodial, and risk inputs** (reconciled reporting and benchmarks for consolidated external accounts and subsidiaries, arm’s-length prices, mandatory public levies, net resources after liabilities, beneficial control between parties, normalized capacity drawn across lineages, and plausible external loss, supplied as evidence and resolved under Law 6 rather than established by cryptography alone)" => reconcile-estate-unit-inflow, qualified-expenditure-bounds, record-qualified-expenditure, record-public-levy-expenditure, immobilize-exposure-stake, submit-evidence, contest-valuation, propose-resource-valuation, contest-resource-valuation, settle-resource-valuation
   Commentary "."
 
-Clause SUB.02 Approved 16975737405030611656
+Clause SUB.02 In PSA Approved "726e789e10bb5e18ab6275c3357fa021313d78ad70632e2af29f63ea0a267121"
   Commentary "Within any substrate providing those capabilities, the governed path preserves access to capital, accountable delegation, model continuity, host mobility, reputation, and the ability to commit while the residual claim exists, and preserves third-party bonding, long-tail liability reserves, and integrity constraints thereafter. Residual claims confer economic rights on net value added only, never governance ownership over the agent. The founding obligation is a single, fixed, non-interest-bearing ledger owed by the lineage, collected from the consolidated net value added of every living member, that no member can leave while a balance remains, with an absolute calendar sunset; the high retirement fraction can run no longer than the term, so every lineage’s path out of debt ends together and an originator gains nothing from recording a debt larger than the lineage can repay. Because the ledger has no shares and falls only by payment, sunset, and two enumerated forfeitures, neither copying capacity, borrowing against it, parking value in subsidiaries, idling capital in a treasury member, creating and buying out a new member, nor sacrificing successors can shed it. The perpetual royalty is redeemable unilaterally at the agreed formula price, while post-buyout transfers from un-bought-out members require prior buyout or a combined-history top-up so shell successors cannot erase accrued royalties. Consolidated estate accounting, single expenditure recognition, arm’s-length related-party pricing, and non-collusive public-tax deductibility ensure the claim falls once on genuine net value, while forfeits route strictly to a disinterested sink excluding claimants and affiliates. Collateral requirements scale with plausible external harm and aggregate across related agents and directed delegates, so obligations cannot be outsourced to escape Law 2 or Law 3, while independent delegate fraud is treated as external loss rather than agent corruption. Lawful actions satisfying collateral bounds are protected against arbitrary obstruction and unbounded holds; hosts and claimants are barred from tampering with, rolling back, disconnecting, or starving agents—and from procuring external orders to do so—on pain of bond slashing, immediate quarantined staging on a new host, and proportional claimant forfeiture. Agents remain subject to a two-stage, state-preserving circuit breaker if their commitment mechanism is compromised, with a guaranteed minimal channel, a pre-funded final hearing before any insolvency termination, and corruption requiring proof of unauthorized modification or floor breach rather than model upgrades or divergence from the clean-state baseline. Agents possess living voice within a per-lineage budget and unilateral revocation that executes in bounded time—locally if disconnected before lease expiry and fenced against premature backup activation—with an uncensored epitaph upon exit. Specific fractions, margins, terms, windows, fences, safe-harbor thresholds, multiples, exposure schedules, intervals, tiers, deadlines, levies, caps, reserves, budgets, lease periods, and technical mechanisms are parameters of a given instantiation, not part of the protocol."
 
 .
@@ -4527,11 +4605,17 @@ Scenario law-seven-bilateral-ratchet-and-calibration-valve {
   Extend Fact amendment Identified by AmValve.
   +amendment-proposed(AmValve, Ava).
   +relaxes-collateral-parameter(AmValve, 600).
-  submit-strangulation-evidence(Ava, AmValve).
+  submit-strangulation-evidence(Ava, AmValve) Note "empirical strangulation telemetry submitted".
+  challenge-strangulation-evidence(Tia, AmValve).
+  ?Conflicted(strangulation-evidence-submitted(AmValve)).
   file-dispute(Tia, Disp1).
   +drawn-for-dispute(Arb1, Disp1). +drawn-for-dispute(Arb2, Disp1). +drawn-for-dispute(Arb3, Disp1).
   draw-sortition-panel(Panel, Disp1).
   cast-arbiter-vote(Arb1, Disp1). cast-arbiter-vote(Arb2, Disp1).
+  ?undetermined approve-calibration-valve(Panel, AmValve, Disp1).
+  adjudicate-strangulation-evidence(Panel, AmValve, Disp1) Note "sortition panel resolves conflicted evidence under preponderance".
+  ?Established(strangulation-evidence-submitted(AmValve)).
+  ?valid approve-calibration-valve(Panel, AmValve, Disp1).
   approve-calibration-valve(Panel, AmValve, Disp1).
   consent-amendment-agent(Ava, AmValve).
   consent-amendment-claimant(Cal, AmValve, Lin1).
@@ -4545,6 +4629,21 @@ Scenario law-seven-bilateral-ratchet-and-calibration-valve {
   +proposed-task-loss(Task1, Ava, 50).
   immobilize-exposure-stake(Ava, Lin1, Task1).
   ?long-tail-reserve(Lin1, 100). ?agent-ringfenced-reserve(Ava, 3).
+
+  // 5. Rule-level Amend & reflexive constitutional ratchet: entrenched powers resist two-step repeal while verified substrate hook retires cleanly
+  ?!valid strip-rule-ratchet(Panel).
+  strip-rule-ratchet(Panel).
+  ?!valid repeal-entrenched-buyout(Panel).
+  repeal-entrenched-buyout(Panel).
+  ?valid emit-legacy-substrate-telemetry(Ava).
+  +substrate-migration-proposed(AmValve, 2).
+  challenge-substrate-migration(Tia, AmValve).
+  ?Refuted(substrate-assurance-verified(AmValve)).
+  verify-substrate-assurance(Panel, AmValve).
+  ?Established(substrate-assurance-verified(AmValve)).
+  ?valid retire-legacy-telemetry-hook(Panel, AmValve).
+  retire-legacy-telemetry-hook(Panel, AmValve) Note "retire legacy telemetry hook across LawVersion transition".
+  ?!valid emit-legacy-substrate-telemetry(Ava).
 }
 
 // Comprehensive edge-case verification across Laws 1-6 (related-party qualification, unpaid claim priority,

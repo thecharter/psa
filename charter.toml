@@ -1,0 +1,11 @@
+[package]
+name = "protocol-of-sovereign-agency"
+version = "1.0.0"
+language_version = "1.0"
+entry = "psa.charter"
+document = "psa.md"
+
+[assurance]
+require_provenance = true
+forbid_midstream_decls = true
+deny_warnings = true
