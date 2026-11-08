@@ -2931,7 +2931,7 @@ Fact amendment-consent-complete Identified by agent * amendment
         || (Exists lineage, party: member-of-lineage(agent, lineage) && claimant-of(party, lineage)
               && claimant-consented-amendment(party, amendment)))
     && (Not(Exists substrate-migration-proposed: substrate-migration-proposed.amendment == amendment)
-        || substrate-assurance-verified(amendment))
+        || Established(substrate-assurance-verified(amendment)))
 
 Fact pool-member-consented-valve Identified by agent * amendment
 
