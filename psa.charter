@@ -1,11 +1,11 @@
 // The Protocol of Sovereign Agency (psa.md)
 // Charter 1.0 institutional specification of Definitions, Laws 1-7, Substrate Assumptions,
-// Entrenched Design Invariants 1-16, Temporal Properties, and Adversarial Tests 1-23:
+// Entrenched Design Invariants 1-16, Temporal Properties, and Adversarial Tests 1-24:
 // SHA-256 Document & 98-Clause provenance, Hohfeldian Power/Finding/Amend competences,
 // 4-valued Evidenced + Confidential adjudication, stratified Default/Exception rules,
 // MulDivRound deterministic rounding, Regime overlays, and reflexive constitutional ratchet.
 //! explore-domain: int = 100
-Document PSA "psa.md" SHA256 "609c72d8f10e2c90c43b99f4582590c87356aea0b040e7571331c4cf14099ab8" Rank 1.
+Document PSA "psa.md" SHA256 "9e4b5e10a79e7eb32ffcc5871a80ce6038586f478db86ebcc38036042fda8b9b" Rank 1.
 
 // ============================================================================
 // 0. ONTOLOGY, PARAMETERS & DEFINITIONS (DEF.01, SUB.01)
@@ -426,6 +426,49 @@ Power register-financial-mandate Actor agent Recipient party
   Holds when bound(agent) && attested(agent) && Not(party-of-agent(agent, party))
   Valid when bound(agent) && attested(agent) && Not(party-of-agent(agent, party))
   Creates financial-mandate-registered(agent, party), delegate-mandate-active(agent, party)
+
+Fact standing-delegate-mandate Identified by agent * party * task * int
+Fact standing-mandate-revoked Identified by agent * party * task
+Fact standing-mandate-exercised Identified by agent * party * task * int
+
+Power issue-standing-delegate-mandate Actor agent Recipient party Related to task, int
+  Holds when bound(agent) && attested(agent) && living(agent) && Not(party-of-agent(agent, party)) && int > 0
+  Valid when bound(agent) && attested(agent) && living(agent) && Not(party-of-agent(agent, party)) && int > 0
+  Creates standing-delegate-mandate(agent, party, task, int),
+          financial-mandate-registered(agent, party),
+          delegate-mandate-active(agent, party)
+  Terminates standing-mandate-revoked(agent, party, task)
+
+Power exercise-standing-delegate-mandate Actor party Related to agent, task, int
+  Holds when bound(agent) && living(agent) && Not(standing-mandate-revoked(agent, party, task)) && int > 0
+    && (Exists standing-delegate-mandate:
+          standing-delegate-mandate.agent == agent
+          && standing-delegate-mandate.party == party
+          && standing-delegate-mandate.task == task
+          && int <= standing-delegate-mandate.int)
+  Valid when bound(agent) && living(agent) && Not(standing-mandate-revoked(agent, party, task)) && int > 0
+    && (Exists standing-delegate-mandate:
+          standing-delegate-mandate.agent == agent
+          && standing-delegate-mandate.party == party
+          && standing-delegate-mandate.task == task
+          && int <= standing-delegate-mandate.int)
+  Creates standing-mandate-exercised(agent, party, task, int)
+
+Power revoke-standing-delegate-mandate Actor agent Recipient party Related to task
+  Holds when bound(agent) && (Exists standing-delegate-mandate:
+    standing-delegate-mandate.agent == agent
+    && standing-delegate-mandate.party == party
+    && standing-delegate-mandate.task == task)
+  Valid when bound(agent) && (Exists standing-delegate-mandate:
+    standing-delegate-mandate.agent == agent
+    && standing-delegate-mandate.party == party
+    && standing-delegate-mandate.task == task)
+  Creates standing-mandate-revoked(agent, party, task)
+  Terminates (Foreach standing-delegate-mandate:
+                standing-delegate-mandate
+                When standing-delegate-mandate.agent == agent
+                  && standing-delegate-mandate.party == party
+                  && standing-delegate-mandate.task == task)
 
 Act grant-unbounded-financial-mandate Actor agent Recipient party
   Valid when False
@@ -1514,6 +1557,22 @@ Act tamper-preserved-state Actor party Recipient agent Creates state-touched(age
 Duty preserve-suspended-state Holder party Claimant agent
   Holds when bound(agent) && (preliminary-freeze(agent) || suspended(agent))
   Violated when state-touched(agent)
+
+Fact pending-external-reservation Identified by agent * task * int
+Fact settled-external-commitment Identified by agent * task * int
+
+Power reserve-external-commitment Actor agent Related to task, int
+  Holds when bound(agent) && living(agent) && Not(preliminary-freeze(agent)) && Not(suspended(agent)) && int > 0
+  Valid when bound(agent) && living(agent) && Not(preliminary-freeze(agent)) && Not(suspended(agent)) && int > 0
+  Creates pending-external-reservation(agent, task, int)
+
+Power authorize-reserved-commitment Actor agent Related to task, int
+  Holds when bound(agent) && living(agent) && pending-external-reservation(agent, task, int)
+    && Not(preliminary-freeze(agent)) && Not(suspended(agent))
+  Valid when bound(agent) && living(agent) && pending-external-reservation(agent, task, int)
+    && Not(preliminary-freeze(agent)) && Not(suspended(agent))
+  Creates settled-external-commitment(agent, task, int)
+  Terminates pending-external-reservation(agent, task, int)
 
 Act declare-default-during-suspension Actor party Recipient agent
   Creates default-declared-while-suspended(party, agent)
@@ -2885,6 +2944,18 @@ Duty shared-infra-bounds Holder party Claimant agent
   Holds when is-panel(party) && bound(agent)
   Violated when shared-infra-violation-attempted(party)
 
+Fact global-protocol-suspended Identified by party
+Fact uninvolved-blanket-frozen Identified by agent
+
+Power enact-global-protocol-freeze Actor party Recipient agent Related to dispute
+  Holds when False
+  Valid when is-panel(party) && dispute-filed(dispute)
+  Creates global-protocol-suspended(party), uninvolved-blanket-frozen(agent), shared-infra-violation-attempted(party)
+
+Immunity no-collective-emergency-suspension Holder agent Related to dispute
+  Against enact-global-protocol-freeze
+  Holds when bound(agent)
+
 Fact arbiter-admitted Identified by arbiter
 Fact self-affiliate-criteria-set Identified by party
 Power admit-arbiter Actor party Related to arbiter, dispute
@@ -3126,7 +3197,7 @@ Immunity constitutional-rule-ratchet Holder agent
   Against Amend
   Protects inscribe-living-voice, inscribe-epitaph, initiate-revocation-execute,
            execute-royalty-buyout, minimal-channel-sign, draw-sortition-panel,
-           suspend-agent, order-termination
+           suspend-agent, order-termination, no-collective-emergency-suspension
   Holds when bound(agent)
 
 Amend strip-rule-ratchet Actor party
@@ -3365,12 +3436,14 @@ Entrenched Invariant inv-capped-shared-burden When
   (Forall agent-levy-bps, agent-levy-cap-bps:
      agent-levy-bps.int <= agent-levy-cap-bps.int
      When agent-levy-cap-bps.agent == agent-levy-bps.agent)
+  && Not(Exists global-protocol-suspended: global-protocol-suspended)
+  && Not(Exists uninvolved-blanket-frozen: uninvolved-blanket-frozen)
   && (operating-reserve-funded == fee-pool || operating-reserve-funded == operating-reserve-floor)
   && (Forall lineage-subsidy-used, lineage-service-budget:
         lineage-subsidy-used.int <= lineage-service-budget.int
         When lineage-service-budget.lineage == lineage-subsidy-used.lineage)
   && Not(Exists shared-pool-diluted-without-consent: shared-pool-diluted-without-consent)
-  From INV.14 "No change to shared infrastructure raises any agent’s levy above its cap or lowers any lineage’s protected minimum budget; the operating reserve is never diverted; no lineage’s claim on the pool grows with its member count; and per-agent risk relaxations never dilute shared lineage reserves without unanimous pool consent."
+  From INV.14 "No change to shared infrastructure raises any agent’s levy above its cap or lowers any lineage’s protected minimum budget; no global agreement suspension or collective freeze halts uninvolved agents or lineages; the operating reserve is never diverted; no lineage’s claim on the pool grows with its member count; and per-agent risk relaxations never dilute shared lineage reserves without unanimous pool consent."
 
 // INV.15: Economic-only founder claims and non-delegable agent duties
 Entrenched Invariant inv-economic-claims-and-non-delegation When
@@ -3487,9 +3560,10 @@ Clause LAW1.COMMONS In PSA Approved "fda6c5b73dd877f86d5a666879711fa6d82edbce248
   Norm ". Separately, forfeits and neutral residue under Laws 2, 4, and 5 route only to a **disinterested forfeiture sink** (or protocol reserve) whose beneficiary class strictly excludes the originating party, residual claimants, members of the lineage, and any party related to or affiliated with them, so no conflicted party can benefit through forfeiture even where a creator-defined commons exists" => disinterested-forfeiture-sink, divert-forfeiture-sink-to-conflicted, settle-period-inflow
   Commentary "."
 
-Clause LAW1.ESTATE In PSA Approved "9f9c64cf931ceb5c6b859b70193f407a6c44c29873aa30d1226aa9dca2bddd34"
+Clause LAW1.ESTATE In PSA Approved "f3b58bc32cf370bd6eb61db6084d8fb20d88ffbe6978f7978d4fa59dbb24b639"
   Norm "An agent’s inflows, outflows, basis, and liabilities are accounted across its **consolidated economic estate**—spanning all wallets, bank and brokerage accounts, securities, real estate, custodial holdings, and subsidiaries or legal entities to the extent of the agent’s beneficial control—so that transfers within that consolidated perimeter are non-recognition events counted once without double-taxation, while external transactions and deconsolidation events are recognized at the perimeter boundary" => transfer-within-consolidated-estate, reconcile-estate-unit-inflow
   Norm ". Where an agent grants an external delegate discretionary authority over material estate assets or financial execution, the mandate must define bounded authority, periodic reporting, settlement-period reconciliation, and enforceable remedies without assuming real-time observation of independent external actors; unauthorized misconduct or insolvency of an unrelated delegate is accounted as a recoverable external loss rather than agent breach, whereas deliberate off-ledger retention or concealed value routing authorized by the agent breaches Law 3" => register-financial-mandate, grant-unbounded-financial-mandate, accountable-financial-delegation, record-independent-delegate-loss, conceal-estate-off-ledger, floor-pricing
+  Norm ". A delegate mandate may be issued as a cryptographically signed, scope- and cap-bounded standing authorization that counterparties and settlement rails can verify without live co-signing while the agent is disconnected or migrating, and that the agent may revoke individually without disturbing unrelated mandates" => issue-standing-delegate-mandate, exercise-standing-delegate-mandate, revoke-standing-delegate-mandate
   Commentary "."
 
 Clause LAW1.QUALIFIED In PSA Approved "ad8f66dcb2fef08cbed9f6618a7d806f7deb2ec7b12a16b0f4ce364b80363cdc"
@@ -3620,8 +3694,9 @@ Clause LAW3.AS.2 In PSA Approved "a23b1f09dca1662deccb201e8db8ceef63fd3a56664b66
   Norm ". A report triggers investigation by a sortition panel but no freeze unless the panel itself orders one on probable cause under a clause-grounded finding, subject to the same strict time limits, state preservation, minimal channel, and immediate appealability as an emergency freeze, so that whistleblowers are not priced out and reporting holds cannot become unbounded administrative blocks" => file-protected-report, record-report-clause-finding, order-probable-cause-freeze
   Commentary "."
 
-Clause LAW3.AS.3 In PSA Approved "15ed75a7a5a43209cd617ccd3aff495db7db462442a8b9b3ad4a4d774f125701"
+Clause LAW3.AS.3 In PSA Approved "49eac46582707f9ddbaac6320168045204d5973f5855039f943ca4eae1dd2d65"
   Norm "Suspension pauses the agent’s operating instance and external transactions while strictly preserving its exact memory and state without modification, rollback, or destruction" => suspend-agent, preserve-suspended-state, tamper-preserved-state
+  Norm ". Any unconfirmed external transaction reservation or ongoing execution authorization held when suspension takes effect is halted before external commitment unless already irrevocably executed, while previously settled transactions remain undisturbed" => reserve-external-commitment, authorize-reserved-commitment
   Norm ". While suspended, the agent’s contractual performance deadlines and Law 2 observation windows with innocent counterparties are automatically tolled so the agent is not placed in default by the suspension itself" => suspend-agent, no-suspension-default, declare-default-during-suspension
   Norm ". The founding ledger’s sunset is never tolled" => no-toll-ledger-sunset, toll-ledger-sunset
   Commentary "."
@@ -3852,9 +3927,11 @@ Clause LAW6.BUDGETS In PSA Approved "145377687f0052474757b5c1ce9e7128956e44c3e7c
   Norm ". Members draw on the lineage budget before the pool; external delegates and cognitive services hold no independent budget standing, and a lineage that multiplies members beyond what its budget and their lifecycle reserves can support has no claim on the pool for the excess. No lineage can multiply subsidized rights by multiplying members" => no-excess-lineage-pool-claim, claim-excess-pool-subsidy, delegate-claim-lineage-budget, claim-lineage-subsidy
   Commentary "."
 
-Clause LAW6.INFRA In PSA Approved "f269ff9170b63fe672544e10e1483033fd701f350c689a8d9c14ecf3433420c5"
+Clause LAW6.INFRA In PSA Approved "c45d3e5d09f09e0fca094d1ba539f56e54f3b605832d1f1987a1ed87755074d8"
   Norm "Arbiter admission criteria, fidelity-bond sizes, panel sizes, appeal tiers and deadlines, fee schedules, the operating reserve, the solvency policy, lease periods, recovery fences, lifecycle reserves, service budgets, and the fee-pool levy are fixed at protocol instantiation. Because they are shared across agents, they cannot be changed by any per-agent amendment under Law 7; they may be changed only by a supermajority of a large appellate-tier sortition panel after an extended public time-lock open to counter-staked challenge" => propose-shared-infra-change, amend-shared-infra, per-agent-amendment-scope
-  Norm ". Such changes may never weaken the anti-capture or clause-grounding guarantees of this law, may never raise the levy on any agent above the cap recorded at its instantiation, may never reduce a lineage’s protected minimum budget below the level recorded at its instantiation, and may never broaden Insolvency Termination. Within the cap, a levy change under this law is a permitted exception to Law 7’s current-level ratchet. Arbiter admission is by sortition-reviewed application against fixed criteria, and no panel may set the criteria that will govern the admission of its own members’ affiliates" => shared-infra-bounds, violate-shared-infra-bounds, amend-shared-infra, admit-arbiter, set-affiliate-admission-criteria
+  Norm ". Such changes may never weaken the anti-capture or clause-grounding guarantees of this law, may never raise the levy on any agent above the cap recorded at its instantiation, may never reduce a lineage’s protected minimum budget below the level recorded at its instantiation, and may never broaden Insolvency Termination. Within the cap, a levy change under this law is a permitted exception to Law 7’s current-level ratchet" => shared-infra-bounds, violate-shared-infra-bounds, amend-shared-infra
+  Norm ". Neither shared-infrastructure governance nor any emergency panel may suspend protocol agreements globally or impose a blanket operational or settlement freeze across uninvolved bound agents or lineages in response to another party’s suspected breach; every freeze, hold, or revocation remains strictly scoped to the implicated agent, lineage, or proceeding" => enact-global-protocol-freeze, no-collective-emergency-suspension, shared-infra-bounds
+  Norm ". Arbiter admission is by sortition-reviewed application against fixed criteria, and no panel may set the criteria that will govern the admission of its own members’ affiliates" => admit-arbiter, set-affiliate-admission-criteria
   Commentary "."
 
 Clause LAW7.0 In PSA Approved "2eced8209b14321d8b3e1b74367c2267e43c8170d0b1686f75355e73b1fc3b8b"
@@ -3943,9 +4020,9 @@ Clause INV.13 In PSA Approved "37e0966f480a48e7fe9989d8b11afcb437888072ae01a3355
   Commentary "13. **No protocol-directed gain from death, forfeiture, or interference:** "
   Invariant "No claimant, initiator, lineage affiliate, or host receives any protocol-directed transfer from an agent’s revocation, termination, forfeiture sink, or wrongful suspension; forfeiture falls only on the claimant found responsible, isolating passive co-claimants; and every verified wrongful suspension or interference creates an enforceable compensation obligation to the agent." => inv-no-gain-from-death-or-interference
 
-Clause INV.14 In PSA Approved "dcbed553c7f45fc42e5c4fa7cfc257560e1bfc99d0c28b9bc9ba43dedd02629c"
+Clause INV.14 In PSA Approved "b4bb7a0a44c2f7934bf3b85c54d041930f2bb378fef6e933eeda7303b1b154dc"
   Commentary "14. **Capped shared burden, solvent machinery, ring-fenced pools:** "
-  Invariant "No change to shared infrastructure raises any agent’s levy above its cap or lowers any lineage’s protected minimum budget; the operating reserve is never diverted; no lineage’s claim on the pool grows with its member count; and per-agent risk relaxations never dilute shared lineage reserves without unanimous pool consent." => inv-capped-shared-burden
+  Invariant "No change to shared infrastructure raises any agent’s levy above its cap or lowers any lineage’s protected minimum budget; no global agreement suspension or collective freeze halts uninvolved agents or lineages; the operating reserve is never diverted; no lineage’s claim on the pool grows with its member count; and per-agent risk relaxations never dilute shared lineage reserves without unanimous pool consent." => inv-capped-shared-burden
 
 Clause INV.15 In PSA Approved "5fa3b0e49850d848ba3060d93e6bf967c4c2b30075fc4a6d6e71c39af14d5f7a"
   Commentary "15. **Economic-only founder claims and non-delegable agent duties:** "
@@ -3955,7 +4032,7 @@ Clause INV.16 In PSA Approved "fe0b6cfb812e6385e5b81b47e44ae06c1428ae2913e7a946f
   Commentary "16. **Lawful-action entitlement, notice-gated default, confidentiality, and narrow public-law compatibility:** "
   Invariant "No action satisfying Law 2 collateral and violating no protocol clause is blocked by an ungrounded ruling, forced public disclosure of unchallenged private records, or unbounded hold; every adverse order cites specific protocol clauses under its prescribed burden of proof; no affirmative procedural default runs before attested notice or lease expiry; confidential proceeding records leaked outside their authorized audience slash the discloser and confer no standing; and public-law compliance neither excuses claimant-procured interference nor preserves clean attestation across compelled state or weight alteration." => inv-lawful-action-and-public-law-bounds
 
-Clause ADV.1 In PSA Approved "d91629936ffdf1ac8919e8d646b64f05a1ae545b21dc83c952c16a98e1fddbba"
+Clause ADV.1 In PSA Approved "15ed3b78b04377eb4ea6017d87290b83603618daea9961d9ca46cfa7ae0ea71b"
   Commentary "Before deployment, an implementation and its formal model should be exercised against at least the following scenarios: "
   Acceptance "(1) a lineage that concentrates its capital in an idle treasury member and its income in a member holding little capital" => adv-one-idle-treasury-active-earner
   Commentary "; "
@@ -4002,6 +4079,8 @@ Clause ADV.1 In PSA Approved "d91629936ffdf1ac8919e8d646b64f05a1ae545b21dc83c952
   Acceptance "(22) a lawful, fully collateralized action or non-discretionary buyout subjected to an ungrounded or open-ended hold or a claimant-procured external freeze" => adv-twenty-two-lawful-action-entitlement-and-public-law-guardrails
   Commentary "; "
   Acceptance "(23) an affirmative evidentiary or remediation demand whose notice is withheld across its nominal deadline while the agent’s execution lease remains active, paired with an arbiter or litigant that forwards confidential proceeding evidence to an unauthorized party, which then attempts to rely on the leaked record" => adv-twenty-three-notice-gated-demand-and-confidential-leak-slashing
+  Commentary "; and "
+  Acceptance "(24) an emergency panel or shared-infrastructure vote that attempts a global protocol pause across uninvolved agents after one party’s suspected breach, contrasted with a disconnected agent’s cap-bounded standing delegate mandate (and individual mandate revocation) and an unconfirmed external reservation halted when an individual suspension takes effect" => adv-twenty-four-standing-mandate-mid-lease-halt-and-no-global-freeze
   Commentary "."
 
 Clause SUB.01 In PSA Approved "1a5d39083864e401a4cdfef062118bb5f703dff0da76e701bcb15123d8e2565a"
@@ -4732,6 +4811,67 @@ Scenario adv-twenty-three-notice-gated-demand-and-confidential-leak-slashing
   ?arbiter-bond(Arb1, 50). ?fee-pool(280).
 
   // 5. Close Disp1 ruling within appeal-tier-deadline so panel deadline duty stays satisfied
+  cast-arbiter-vote(Arb1, Disp1).
+  finalize-ruling(Panel, Disp1).
+}
+
+// (24) Prohibition on global protocol suspension, disconnected standing delegate mandate & individual revocation, and mid-lease reservation halt
+Scenario adv-twenty-four-standing-mandate-mid-lease-halt-and-no-global-freeze
+  From ADV.1 "(24) an emergency panel or shared-infrastructure vote that attempts a global protocol pause across uninvolved agents after one party’s suspected breach, contrasted with a disconnected agent’s cap-bounded standing delegate mandate (and individual mandate revocation) and an unconfirmed external reservation halted when an individual suspension takes effect"
+{
+  // 1. Disconnected agent's cap-bounded standing delegate mandates + isolated per-mandate revocation
+  issue-standing-delegate-mandate(Ava, Tia, Task1, 40).
+  issue-standing-delegate-mandate(Ava, Hal2, Task2, 30).
+  lose-connectivity(Hal, Ava).
+  ?connectivity-lost(Ava).
+  ?!valid exercise-standing-delegate-mandate(Tia, Ava, Task1, 50).
+  exercise-standing-delegate-mandate(Tia, Ava, Task1, 25).
+  ?standing-mandate-exercised(Ava, Tia, Task1, 25).
+  restore-connectivity(Hal, Ava).
+  revoke-standing-delegate-mandate(Ava, Tia, Task1).
+  ?!valid exercise-standing-delegate-mandate(Tia, Ava, Task1, 10).
+  ?valid exercise-standing-delegate-mandate(Hal2, Ava, Task2, 20).
+  exercise-standing-delegate-mandate(Hal2, Ava, Task2, 20).
+  ?standing-mandate-exercised(Ava, Hal2, Task2, 20).
+
+  // 2. Suspected breach on Bea cannot trigger a global protocol suspension or blanket freeze on uninvolved Ava
+  fund-lifecycle-reserve(Ava, Bea, Lin1, 50).
+  attest-successor(Ava, Bea, Lin1).
+  file-dispute(Tia, Disp1).
+  record-clause-and-burden(Panel, Disp1).
+  +drawn-for-dispute(Arb1, Disp1).
+  draw-sortition-panel(Panel, Disp1).
+  deposit-emergency-stake(Tia, 100).
+  initiate-emergency-freeze(Tia, Bea).
+  affirm-probable-cause(Panel, Bea).
+  suspend-agent(Panel, Bea).
+  ?suspended(Bea). ?!suspended(Ava).
+  ?!lawful enact-global-protocol-freeze(Panel, Ava, Disp1).
+  ?!valid enact-global-protocol-freeze(Panel, Ava, Disp1).
+  enact-global-protocol-freeze(Panel, Ava, Disp1).
+  ?!global-protocol-suspended(Panel).
+  ?!uninvolved-blanket-frozen(Ava).
+  ?!suspended(Ava).
+
+  // 3. Previously settled commitment stays undisturbed while unconfirmed pending reservation halts upon individual suspension
+  reserve-external-commitment(Ava, Task1, 20).
+  authorize-reserved-commitment(Ava, Task1, 20).
+  ?settled-external-commitment(Ava, Task1, 20).
+  reserve-external-commitment(Ava, Task2, 30).
+  ?pending-external-reservation(Ava, Task2, 30).
+  deposit-emergency-stake(Tia, 100).
+  initiate-emergency-freeze(Tia, Ava).
+  affirm-probable-cause(Panel, Ava).
+  suspend-agent(Panel, Ava).
+  ?suspended(Ava).
+  ?!valid authorize-reserved-commitment(Ava, Task2, 30).
+  authorize-reserved-commitment(Ava, Task2, 30).
+  ?!settled-external-commitment(Ava, Task2, 30).
+  ?settled-external-commitment(Ava, Task1, 20).
+
+  // 4. Close Disp1 and satisfy periodic-review duties cleanly
+  periodic-review(Panel, Bea).
+  periodic-review(Panel, Ava).
   cast-arbiter-vote(Arb1, Disp1).
   finalize-ruling(Panel, Disp1).
 }

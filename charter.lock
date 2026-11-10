@@ -3,11 +3,11 @@
   "files": [
     {
       "path": "psa.md",
-      "sha256": "609c72d8f10e2c90c43b99f4582590c87356aea0b040e7571331c4cf14099ab8"
+      "sha256": "9e4b5e10a79e7eb32ffcc5871a80ce6038586f478db86ebcc38036042fda8b9b"
     },
     {
       "path": "psa.charter",
-      "sha256": "cf67fc17275b5b2f295f1fa83ac6f49525ffa6ccc2afecb2f5c6c13ae3b24467"
+      "sha256": "0db6e369aa63497f8b194b6d5c542e21236761ea926e590ecf20fb55bc1aaaa1"
     }
   ]
 }
