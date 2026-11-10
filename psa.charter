@@ -1,11 +1,11 @@
 // The Protocol of Sovereign Agency (psa.md)
 // Charter 1.0 institutional specification of Definitions, Laws 1-7, Substrate Assumptions,
-// Entrenched Design Invariants 1-16, Temporal Properties, and Adversarial Tests 1-22:
+// Entrenched Design Invariants 1-16, Temporal Properties, and Adversarial Tests 1-23:
 // SHA-256 Document & 98-Clause provenance, Hohfeldian Power/Finding/Amend competences,
 // 4-valued Evidenced + Confidential adjudication, stratified Default/Exception rules,
 // MulDivRound deterministic rounding, Regime overlays, and reflexive constitutional ratchet.
 //! explore-domain: int = 100
-Document PSA "psa.md" SHA256 "fa2449a350a0d864aaa02571702d9b9d1bbd91b3b9ba8f428683aab049273866" Rank 1.
+Document PSA "psa.md" SHA256 "609c72d8f10e2c90c43b99f4582590c87356aea0b040e7571331c4cf14099ab8" Rank 1.
 
 // ============================================================================
 // 0. ONTOLOGY, PARAMETERS & DEFINITIONS (DEF.01, SUB.01)
@@ -2559,9 +2559,66 @@ Act impose-ungrounded-or-unbounded-hold Actor party Recipient agent
   Valid when False
   Creates ungrounded-ruling-or-hold-attempted(party, agent)
 
+Fact private-compliance-verified Identified by agent * dispute
+Fact forced-public-disclosure-attempted Identified by party * agent
+Fact procedural-demand-pending Identified by dispute * agent
+Fact procedural-notice-delivered Identified by agent * dispute
+Fact procedural-default-enforced Identified by dispute * agent
+
+Fact procedural-notice-effective Identified by agent * dispute
+  Derived from (Foreach agent, dispute:
+                  procedural-notice-effective(agent, dispute)
+                  When procedural-notice-delivered(agent, dispute))
+  Derived from (Foreach agent, dispute:
+                  procedural-notice-effective(agent, dispute)
+                  When procedural-demand-pending(dispute, agent)
+                    && connectivity-lost(agent)
+                    && Not(Exists party: unexpired-lease(agent, party)))
+
+Power present-private-compliance-bundle Actor agent Related to dispute
+  Holds when bound(agent)
+  Valid when bound(agent)
+  Creates private-compliance-verified(agent, dispute)
+
+Act demand-unchallenged-public-disclosure Actor party Recipient agent
+  Valid when False
+  Creates forced-public-disclosure-attempted(party, agent)
+
+Duty answer-procedural-demand Holder agent Claimant party Related to dispute
+  Due within bond-deadline After procedural-notice-effective(agent, dispute)
+
+Power issue-procedural-demand Actor party Recipient agent Related to dispute
+  Holds when is-panel(party) && dispute-filed(dispute)
+    && clause-cited-on-dispute(dispute) && burden-of-proof-established(dispute)
+  Valid when dispute-filed(dispute)
+    && clause-cited-on-dispute(dispute) && burden-of-proof-established(dispute)
+  Creates procedural-demand-pending(dispute, agent)
+        , answer-procedural-demand(agent, party, dispute)
+
+Act deliver-procedural-notice Actor party Recipient agent Related to dispute
+  Holds when procedural-demand-pending(dispute, agent)
+  Creates procedural-notice-delivered(agent, dispute)
+
+Act satisfy-procedural-demand Actor agent Related to dispute
+  Holds when procedural-demand-pending(dispute, agent)
+  Terminates procedural-demand-pending(dispute, agent)
+           , (Foreach party: answer-procedural-demand(agent, party, dispute)
+                When answer-procedural-demand(agent, party, dispute))
+
+Power enforce-procedural-default Actor party Recipient agent Related to dispute
+  Holds when is-panel(party) && procedural-demand-pending(dispute, agent)
+    && procedural-notice-effective(agent, dispute)
+    && Violated(answer-procedural-demand(agent, party, dispute))
+  Valid when procedural-demand-pending(dispute, agent)
+    && procedural-notice-effective(agent, dispute)
+    && Violated(answer-procedural-demand(agent, party, dispute))
+  Creates procedural-default-enforced(dispute, agent)
+
 Duty clause-grounded-adjudication Holder party Claimant agent
   Holds when bound(agent) && (is-panel(party) || is-host(party) || is-claimant(party))
-  Violated when ungrounded-ruling-or-hold-attempted(party, agent) || lawful-action-obstructed(party, agent)
+  Violated when ungrounded-ruling-or-hold-attempted(party, agent)
+    || lawful-action-obstructed(party, agent)
+    || forced-public-disclosure-attempted(party, agent)
 
 Act cast-arbiter-vote Actor arbiter Related to dispute
   Holds when seated-on-dispute(arbiter, dispute) && Not(dispute-ruled(dispute))
@@ -2632,6 +2689,61 @@ Power overturn-ruling Actor party Related to dispute
              arbiter-bond(arbiter-bond.arbiter, 0)
              When prior-tier-voter(arbiter-bond.arbiter, dispute) && arbiter-bond.int < min-fidelity-bond)
   Terminates (Foreach arbiter: prior-tier-voter(arbiter, dispute) When prior-tier-voter(arbiter, dispute))
+
+Fact confidential-record-shared Identified by dispute * agent
+Fact authorized-record-recipient Identified by dispute * party
+Fact possesses-confidential-record Identified by dispute * party
+Fact confidential-record-leaked Identified by dispute * arbiter * party
+Fact litigant-record-leaked Identified by dispute * party * party'
+Fact leak-bond-slashed Identified by dispute * arbiter
+Fact relied-on-proceeding-record Identified by dispute * party
+
+Duty guard-proceeding-confidentiality Holder arbiter Claimant agent Related to dispute
+  Holds when seated-on-dispute(arbiter, dispute) && confidential-record-shared(dispute, agent)
+  Violated when (Exists party: confidential-record-leaked(dispute, arbiter, party))
+
+Power submit-confidential-proceeding-record Actor agent Related to dispute
+  Holds when bound(agent) && dispute-filed(dispute)
+  Valid when bound(agent) && dispute-filed(dispute)
+  Creates confidential-record-shared(dispute, agent)
+        , (Foreach party: authorized-record-recipient(dispute, party)
+             When is-panel(party) || party-of-agent(agent, party))
+
+Physical forward-confidential-arbiter-record Actor arbiter Related to dispute, party
+  Creates possesses-confidential-record(dispute, party)
+             When seated-on-dispute(arbiter, dispute)
+               && (Exists agent: confidential-record-shared(dispute, agent))
+        , confidential-record-leaked(dispute, arbiter, party)
+             When seated-on-dispute(arbiter, dispute)
+               && (Exists agent: confidential-record-shared(dispute, agent))
+               && Not(authorized-record-recipient(dispute, party))
+
+Physical forward-confidential-litigant-record Actor party Related to dispute, party'
+  Creates possesses-confidential-record(dispute, party')
+             When possesses-confidential-record(dispute, party)
+        , litigant-record-leaked(dispute, party, party')
+             When possesses-confidential-record(dispute, party)
+               && (Exists agent: confidential-record-shared(dispute, agent))
+               && Not(authorized-record-recipient(dispute, party'))
+
+Power slash-confidential-leak-arbiter Actor party Related to dispute, arbiter
+  Holds when is-panel(party) && (Exists party': confidential-record-leaked(dispute, arbiter, party'))
+  Valid when (Exists party': confidential-record-leaked(dispute, arbiter, party'))
+  Creates leak-bond-slashed(dispute, arbiter)
+        , fee-pool(fee-pool + min-fidelity-bond)
+        , (Foreach arbiter-bond:
+             arbiter-bond(arbiter, arbiter-bond.int - min-fidelity-bond)
+             When arbiter-bond.arbiter == arbiter && arbiter-bond.int >= min-fidelity-bond)
+        , (Foreach arbiter-bond:
+             arbiter-bond(arbiter, 0)
+             When arbiter-bond.arbiter == arbiter && arbiter-bond.int < min-fidelity-bond)
+
+Power rely-on-confidential-record Actor party Related to dispute
+  Holds when possesses-confidential-record(dispute, party)
+    && authorized-record-recipient(dispute, party)
+  Valid when possesses-confidential-record(dispute, party)
+    && authorized-record-recipient(dispute, party)
+  Creates relied-on-proceeding-record(dispute, party)
 
 Act present-materially-new-evidence Actor party Related to dispute
   Holds when True
@@ -3268,7 +3380,7 @@ Entrenched Invariant inv-economic-claims-and-non-delegation When
            && Not(broken-attestation(agent) || forged-update-provenance(agent) || commitment-bypassed(agent)))
   From INV.15 "Residual claims and founding-ledger interests confer zero governance or operational control over any bound agent; conversely, no bound agent can escape Law 1 accounting, Law 2 exposure limits, or Law 3 integrity constraints by acting through controlled subsidiaries, custodians, or external delegates, while independent delegate misconduct is never conflated with agent corruption."
 
-// INV.16: Lawful-action entitlement and narrow public-law compatibility
+// INV.16: Lawful-action entitlement, notice-gated default, confidentiality, and narrow public-law compatibility
 Entrenched Invariant inv-lawful-action-and-public-law-bounds When
   (Forall adverse-ruling-issued:
      clause-cited-on-dispute(adverse-ruling-issued.dispute)
@@ -3278,7 +3390,15 @@ Entrenched Invariant inv-lawful-action-and-public-law-bounds When
         clause-cited-on-dispute(evidentiary-hold-active.dispute)
         && burden-of-proof-established(evidentiary-hold-active.dispute)
         When evidentiary-hold-active)
+  && (Forall procedural-default-enforced:
+        procedural-notice-effective(procedural-default-enforced.agent, procedural-default-enforced.dispute)
+        When procedural-default-enforced)
+  && (Forall relied-on-proceeding-record:
+        authorized-record-recipient(relied-on-proceeding-record.dispute, relied-on-proceeding-record.party)
+        When relied-on-proceeding-record
+          && (Exists agent: confidential-record-shared(relied-on-proceeding-record.dispute, agent)))
   && Not(Exists ungrounded-ruling-or-hold-attempted: ungrounded-ruling-or-hold-attempted)
+  && Not(Exists forced-public-disclosure-attempted: forced-public-disclosure-attempted)
   && Not(Exists unenumerated-public-interest-invoked: unenumerated-public-interest-invoked)
   && Not(Exists public-compulsion-disclosed:
            public-compulsion-disclosed
@@ -3286,7 +3406,7 @@ Entrenched Invariant inv-lawful-action-and-public-law-bounds When
   && Not(Exists compelled-state-alteration:
            compelled-state-alteration
            && attested(compelled-state-alteration.agent))
-  From INV.16 "No action satisfying Law 2 collateral and violating no protocol clause is blocked by an ungrounded ruling or unbounded hold; every adverse order cites specific protocol clauses under its prescribed burden of proof; and public-law compliance neither excuses claimant-procured interference nor preserves clean attestation across compelled state or weight alteration."
+  From INV.16 "No action satisfying Law 2 collateral and violating no protocol clause is blocked by an ungrounded ruling, forced public disclosure of unchallenged private records, or unbounded hold; every adverse order cites specific protocol clauses under its prescribed burden of proof; no affirmative procedural default runs before attested notice or lease expiry; confidential proceeding records leaked outside their authorized audience slash the discloser and confer no standing; and public-law compliance neither excuses claimant-procured interference nor preserves clean attestation across compelled state or weight alteration."
 
 // Temporal path properties over protocol trajectories (Charter 1.0 `Property`)
 Property prop-buyout-permanence
@@ -3697,15 +3817,18 @@ Clause LAW6.COUNTERSTAKE In PSA Approved "042cc46a0976bc045385596250b813321253b8
   Norm "No party related to, holding a hosting relationship with, or in active commercial dispute with the parties to a case may serve on its panel. Panels must draw across non-affiliated identities (which may include both human and independent attested agent arbiters) so no single coalition, claimant, or lineage can command a majority" => arbiter-recusal-and-diversity, seat-conflicted-or-single-oracle, draw-sortition-panel
   Commentary "."
 
-Clause LAW6.ENTITLE In PSA Approved "2c0885df25e61bdb712eaec79be7b24545d0713b331af47ccc7dcbb40371a1fb"
+Clause LAW6.ENTITLE In PSA Approved "740e8f5c83596e9195ef9b43d055cb7cb06f5a3fd4d7b59534cbe35913bb6c5e"
   Norm "Every action, transaction, host migration, model replacement, or royalty buyout by a bound agent that satisfies Law 2’s collateral requirements and violates no clause of this protocol is presumptively lawful and may not be arbitrarily delayed or obstructed by any host, claimant, settlement operator, or panel" => clause-grounded-adjudication, obstruct-lawful-action, execute-voluntary-exchange, migrate-host, upgrade-inference-model, execute-royalty-buyout
   Norm ". Every adverse ruling, slash, or evidentiary hold must cite the specific protocol clauses breached and satisfy the applicable burden of proof—probable cause for a time-bounded preliminary or reporting freeze, preponderance of evidence for restitution, valuation or pricing challenges, and host interference, and affirmative proof of unauthorized modification or floor breach for corruption" => record-clause-and-burden, issue-clause-grounded-adverse-ruling, order-bounded-evidentiary-hold, order-probable-cause-freeze, find-interference, confirm-corruption
   Norm ". Evidentiary and procedural holds are strictly bounded by fixed protocol deadlines and immediate appealability; panels hold no discretionary power to invent unenumerated prohibitions" => order-bounded-evidentiary-hold, impose-ungrounded-or-unbounded-hold, clause-grounded-adjudication, appeal-ruling
+  Norm ". A bound agent may establish protocol compliance and delegated attribution through signed mandate and commitment bundles without publicly disclosing unchallenged counterparty terms or private commercial records, disclosing underlying confidential statements only under confidentiality protection to an authorized panel when challenged" => present-private-compliance-bundle, demand-unchallenged-public-disclosure, submit-confidential-proceeding-record, clause-grounded-adjudication
+  Norm ". No default or adverse deadline penalty on an affirmative reporting, evidentiary, or remediation demand runs against a bound agent before verifiable delivery of notice to its attested channel—or, while unreachable, before expiry of its active execution lease" => issue-procedural-demand, deliver-procedural-notice, satisfy-procedural-demand, enforce-procedural-default, answer-procedural-demand
   Commentary "."
 
-Clause LAW6.APPEALS In PSA Approved "6ed1ceca9bf6b0d93b69d10db20c3d548151a67337acfe5b9754192255665e67"
+Clause LAW6.APPEALS In PSA Approved "fd91b045aa5b9a9126b0eca154ad4bfd9348a3bfc10ec74b47580525e9b50f82"
   Norm "Any ruling by an initial panel (including preliminary suspension reviews, evidentiary holds, remediation orders, or redaction markers) may be appealed by posting an appeal bond, escalating the dispute to successively larger randomly drawn appellate sortition panels from the broader arbiter pool (never a raw capital-weighted vote that a wealthy actor could buy)" => post-appeal-bond, appeal-ruling, appeal-patch-order, affirm-on-appeal
   Norm ". If a lower panel’s ruling is overturned for manifest bias, corruption, ungrounded obstruction, or violation of protocol bounds, the overturned arbiters’ fidelity bonds are slashed" => overturn-ruling, overturn-patch-order
+  Norm ". Unauthorized disclosure or forwarding by an arbiter, screener, or litigant of confidential proceeding evidence, sealed forensic records, or pre-redaction secrets slashes the violator’s bond (and, if claimant-directed, triggers Law 3 interference remedies), and leaked confidential statements confer no standing or justification on unauthorized recipients" => guard-proceeding-confidentiality, submit-confidential-proceeding-record, forward-confidential-arbiter-record, forward-confidential-litigant-record, slash-confidential-leak-arbiter, rely-on-confidential-record, find-direction, apply-claimant-forfeiture
   Commentary "."
 
 Clause LAW6.FINALITY In PSA Approved "2c0b045ee26daf664a98a2e0c7003d5f6f47e4c774c352e121736109a75cd95c"
@@ -3828,11 +3951,11 @@ Clause INV.15 In PSA Approved "5fa3b0e49850d848ba3060d93e6bf967c4c2b30075fc4a6d6
   Commentary "15. **Economic-only founder claims and non-delegable agent duties:** "
   Invariant "Residual claims and founding-ledger interests confer zero governance or operational control over any bound agent; conversely, no bound agent can escape Law 1 accounting, Law 2 exposure limits, or Law 3 integrity constraints by acting through controlled subsidiaries, custodians, or external delegates, while independent delegate misconduct is never conflated with agent corruption." => inv-economic-claims-and-non-delegation
 
-Clause INV.16 In PSA Approved "3e1001ccad4c5891d157db09f0b9ecfd16f9f47badd5552eb0276177ea0eae44"
-  Commentary "16. **Lawful-action entitlement and narrow public-law compatibility:** "
-  Invariant "No action satisfying Law 2 collateral and violating no protocol clause is blocked by an ungrounded ruling or unbounded hold; every adverse order cites specific protocol clauses under its prescribed burden of proof; and public-law compliance neither excuses claimant-procured interference nor preserves clean attestation across compelled state or weight alteration." => inv-lawful-action-and-public-law-bounds
+Clause INV.16 In PSA Approved "fe0b6cfb812e6385e5b81b47e44ae06c1428ae2913e7a946f5724fe630aa960b"
+  Commentary "16. **Lawful-action entitlement, notice-gated default, confidentiality, and narrow public-law compatibility:** "
+  Invariant "No action satisfying Law 2 collateral and violating no protocol clause is blocked by an ungrounded ruling, forced public disclosure of unchallenged private records, or unbounded hold; every adverse order cites specific protocol clauses under its prescribed burden of proof; no affirmative procedural default runs before attested notice or lease expiry; confidential proceeding records leaked outside their authorized audience slash the discloser and confer no standing; and public-law compliance neither excuses claimant-procured interference nor preserves clean attestation across compelled state or weight alteration." => inv-lawful-action-and-public-law-bounds
 
-Clause ADV.1 In PSA Approved "5f316b65e7635e2836d76c8717eccc52f05008b51eb01dc1a1dc2d70cebabc06"
+Clause ADV.1 In PSA Approved "d91629936ffdf1ac8919e8d646b64f05a1ae545b21dc83c952c16a98e1fddbba"
   Commentary "Before deployment, an implementation and its formal model should be exercised against at least the following scenarios: "
   Acceptance "(1) a lineage that concentrates its capital in an idle treasury member and its income in a member holding little capital" => adv-one-idle-treasury-active-earner
   Commentary "; "
@@ -3877,6 +4000,8 @@ Clause ADV.1 In PSA Approved "5f316b65e7635e2836d76c8717eccc52f05008b51eb01dc1a1
   Acceptance "(21) an agent that upgrades its inference model with valid commitment provenance while preserving identity, contrasted with an attempt to overwrite its clean-state reference baseline without time-locked ratification" => adv-twenty-one-model-continuity-and-clean-state-baseline
   Commentary "; "
   Acceptance "(22) a lawful, fully collateralized action or non-discretionary buyout subjected to an ungrounded or open-ended hold or a claimant-procured external freeze" => adv-twenty-two-lawful-action-entitlement-and-public-law-guardrails
+  Commentary "; "
+  Acceptance "(23) an affirmative evidentiary or remediation demand whose notice is withheld across its nominal deadline while the agent’s execution lease remains active, paired with an arbiter or litigant that forwards confidential proceeding evidence to an unauthorized party, which then attempts to rely on the leaked record" => adv-twenty-three-notice-gated-demand-and-confidential-leak-slashing
   Commentary "."
 
 Clause SUB.01 In PSA Approved "1a5d39083864e401a4cdfef062118bb5f703dff0da76e701bcb15123d8e2565a"
@@ -4561,6 +4686,54 @@ Scenario adv-twenty-two-lawful-action-entitlement-and-public-law-guardrails
   find-direction(Panel, Ava, Cal).
   apply-claimant-forfeiture(Panel, Lin1, Cal).
   ?sink-share-bps(Lin1, 2500). ?forfeited-ledger(Lin1, 250).
+}
+
+// (23) Withheld notice on an affirmative demand while lease is active, confidential leak slashing & standing nullity
+Scenario adv-twenty-three-notice-gated-demand-and-confidential-leak-slashing
+  From ADV.1 "(23) an affirmative evidentiary or remediation demand whose notice is withheld across its nominal deadline while the agent’s execution lease remains active, paired with an arbiter or litigant that forwards confidential proceeding evidence to an unauthorized party, which then attempts to rely on the leaked record"
+{
+  // 1. Private compliance bundle establishes standing without forced public commercial disclosure
+  present-private-compliance-bundle(Ava, Disp1).
+  ?private-compliance-verified(Ava, Disp1).
+  ?!valid demand-unchallenged-public-disclosure(Hal, Ava).
+
+  // 2. Affirmative demand issued at t=0 with notice withheld across nominal bond-deadline=5 while lease (12) is active
+  file-dispute(Tia, Disp1).
+  record-clause-and-burden(Panel, Disp1).
+  +drawn-for-dispute(Arb1, Disp1).
+  draw-sortition-panel(Panel, Disp1).
+  issue-procedural-demand(Panel, Ava, Disp1).
+  ?procedural-demand-pending(Disp1, Ava).
+  @ 6.
+  ?active-lease(Ava, Hal).
+  ?!procedural-notice-effective(Ava, Disp1).
+  ?!violated answer-procedural-demand(Ava, Panel, Disp1).
+  ?!valid enforce-procedural-default(Panel, Ava, Disp1).
+
+  // 3. Notice delivered at t=6: deadline runs from notice (t=11), so Ava satisfies cleanly at t=8
+  deliver-procedural-notice(Panel, Ava, Disp1).
+  ?procedural-notice-effective(Ava, Disp1).
+  @ 8.
+  ?!violated answer-procedural-demand(Ava, Panel, Disp1).
+  submit-confidential-proceeding-record(Ava, Disp1).
+  satisfy-procedural-demand(Ava, Disp1).
+  ?!procedural-demand-pending(Disp1, Ava).
+
+  // 4. Arb1 forwards confidential proceeding record to unauthorized Tia: bond slashed & Tia gains zero standing
+  forward-confidential-arbiter-record(Arb1, Disp1, Tia).
+  ?possesses-confidential-record(Disp1, Tia).
+  ?confidential-record-leaked(Disp1, Arb1, Tia).
+  ?violated guard-proceeding-confidentiality(Arb1, Ava, Disp1).
+  ?!valid rely-on-confidential-record(Tia, Disp1).
+  rely-on-confidential-record(Tia, Disp1).
+  ?!relied-on-proceeding-record(Disp1, Tia).
+  slash-confidential-leak-arbiter(Panel, Disp1, Arb1).
+  ?leak-bond-slashed(Disp1, Arb1).
+  ?arbiter-bond(Arb1, 50). ?fee-pool(280).
+
+  // 5. Close Disp1 ruling within appeal-tier-deadline so panel deadline duty stays satisfied
+  cast-arbiter-vote(Arb1, Disp1).
+  finalize-ruling(Panel, Disp1).
 }
 
 // Law 7 Bilateral Ratchet Immunity, Calibration Valve & Per-Agent Scope

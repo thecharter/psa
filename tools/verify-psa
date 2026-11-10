@@ -20,7 +20,7 @@ echo "==> [2/6] Static resolution, SHA-256 Document/98-Clause provenance, & assu
 "$CHARTER_BIN" check --require-provenance --forbid-midstream-decls --deny-warnings psa.charter >/dev/null
 echo "ok   psa.charter: 98 SHA-256 clauses, 100% prose coverage, 0 warnings"
 
-echo "==> [3/6] Execute all 24 adversarial & governance scenarios, 16 Entrenched Invariants, & 3 Temporal Properties"
+echo "==> [3/6] Execute all 25 adversarial & governance scenarios, 16 Entrenched Invariants, & 3 Temporal Properties"
 "$CHARTER_BIN" test --require-provenance --forbid-midstream-decls --deny-warnings psa.charter
 
 echo "==> [4/6] Generate consolidated legal rulebook & statutory Default/Exception decision tables"
